@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Local Cinema</string>
+    <string name="server_title">Kết nối Local Cinema</string>
+    <string name="server_message">Nhập địa chỉ web đang chạy trên PC trong cùng mạng Wi-Fi.</string>
+    <string name="connect">Kết nối</string>
+    <string name="exit">Thoát</string>
+    <string name="cannot_connect">Không thể kết nối</string>
+    <string name="connection_error">Hãy kiểm tra PC, Wi-Fi và Windows Firewall.\n\n%1$s</string>
+    <string name="retry">Thử lại</string>
+    <string name="change_server">Đổi địa chỉ</string>
+</resources>

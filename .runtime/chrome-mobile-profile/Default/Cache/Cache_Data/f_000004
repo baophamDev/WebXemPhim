@@ -1,0 +1,1227 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/App.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=c48212ca"; const Fragment = __vite__cjsImport0_react_jsxDevRuntime["Fragment"]; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("D:/app xem film/apps/web/src/App.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$(), _s2 = $RefreshSig$(), _s3 = $RefreshSig$(), _s4 = $RefreshSig$(), _s5 = $RefreshSig$(), _s6 = $RefreshSig$(), _s7 = $RefreshSig$(), _s8 = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=c48212ca"; const useEffect = __vite__cjsImport3_react["useEffect"]; const useMemo = __vite__cjsImport3_react["useMemo"]; const useState = __vite__cjsImport3_react["useState"];
+import { Routes, Route, Link, useNavigate, useParams, useSearchParams } from "/node_modules/.vite/deps/react-router-dom.js?v=0126b8bf";
+import { Bookmark, ChevronLeft, ChevronRight, Clapperboard, Clock3, Film, Heart, Home as HomeIcon, Info, LoaderCircle, Menu, Play, RefreshCw, Search, Star, X } from "/node_modules/.vite/deps/lucide-react.js?v=b8200317";
+import { useGetFavoriteQuery, useGetMovieQuery, useGetMoviesQuery, useGetSyncQuery, useImportMovieMutation, useSaveProgressMutation, useSearchVsmovQuery, useSetFavoriteMutation, useStartSyncMutation } from "/src/api.ts";
+const image = (movie, wide = false) => wide ? movie.thumbUrl || movie.posterUrl : movie.posterUrl || movie.thumbUrl;
+const clean = (html) => html ? html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "";
+function Logo() {
+  return /* @__PURE__ */ jsxDEV(Link, { className: "logo", to: "/", children: [
+    /* @__PURE__ */ jsxDEV("span", { children: /* @__PURE__ */ jsxDEV(Clapperboard, { size: 22 }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 28,
+      columnNumber: 61
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 28,
+      columnNumber: 55
+    }, this),
+    "LOCAL CINEMA"
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 28,
+    columnNumber: 25
+  }, this);
+}
+_c = Logo;
+function Header() {
+  _s();
+  const nav = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const submit = (e) => {
+    e.preventDefault();
+    if (q.trim()) nav(`/search?q=${encodeURIComponent(q.trim())}`);
+  };
+  return /* @__PURE__ */ jsxDEV("header", { children: [
+    /* @__PURE__ */ jsxDEV(Logo, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 29,
+      columnNumber: 261
+    }, this),
+    /* @__PURE__ */ jsxDEV("nav", { className: open ? "open" : "", children: [
+      /* @__PURE__ */ jsxDEV(Link, { to: "/", children: [
+        /* @__PURE__ */ jsxDEV(HomeIcon, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 29,
+          columnNumber: 318
+        }, this),
+        "Trang chủ"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 29,
+        columnNumber: 305
+      }, this),
+      /* @__PURE__ */ jsxDEV(Link, { to: "/search", children: [
+        /* @__PURE__ */ jsxDEV(Film, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 29,
+          columnNumber: 365
+        }, this),
+        "Thư viện"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 29,
+        columnNumber: 346
+      }, this),
+      /* @__PURE__ */ jsxDEV("button", { className: "nav-close", onClick: () => setOpen(false), children: /* @__PURE__ */ jsxDEV(X, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 29,
+        columnNumber: 449
+      }, this) }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 29,
+        columnNumber: 388
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 29,
+      columnNumber: 269
+    }, this),
+    /* @__PURE__ */ jsxDEV("form", { className: "search-box", onSubmit: submit, children: [
+      /* @__PURE__ */ jsxDEV(Search, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 29,
+        columnNumber: 516
+      }, this),
+      /* @__PURE__ */ jsxDEV("input", { value: q, onChange: (e) => setQ(e.target.value), placeholder: "Tìm phim...", "aria-label": "Tìm phim" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 29,
+        columnNumber: 526
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 29,
+      columnNumber: 469
+    }, this),
+    /* @__PURE__ */ jsxDEV("button", { className: "icon-btn menu-btn", onClick: () => setOpen(true), title: "Mở menu", children: /* @__PURE__ */ jsxDEV(Menu, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 29,
+      columnNumber: 723
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 29,
+      columnNumber: 639
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 29,
+    columnNumber: 253
+  }, this);
+}
+_s(Header, "PUzF6M9JN99iNo4S7cg832Oct8E=", false, function() {
+  return [useNavigate];
+});
+_c2 = Header;
+function Shell({ children }) {
+  return /* @__PURE__ */ jsxDEV(Fragment, { children: [
+    /* @__PURE__ */ jsxDEV(Header, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 30,
+      columnNumber: 70
+    }, this),
+    /* @__PURE__ */ jsxDEV("main", { children }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 30,
+      columnNumber: 80
+    }, this),
+    /* @__PURE__ */ jsxDEV("footer", { children: [
+      /* @__PURE__ */ jsxDEV(Logo, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 30,
+        columnNumber: 111
+      }, this),
+      /* @__PURE__ */ jsxDEV("p", { children: "Thư viện phim cá nhân trên mạng nội bộ" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 30,
+        columnNumber: 119
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 30,
+      columnNumber: 103
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 30,
+    columnNumber: 68
+  }, this);
+}
+_c3 = Shell;
+function MovieCard({ movie }) {
+  return /* @__PURE__ */ jsxDEV(Link, { className: "movie-card", to: `/movie/${movie.slug}`, children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "poster", children: [
+      /* @__PURE__ */ jsxDEV("img", { src: image(movie) || "", alt: movie.name, loading: "lazy" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 31,
+        columnNumber: 137
+      }, this),
+      /* @__PURE__ */ jsxDEV("span", { className: "card-play", children: /* @__PURE__ */ jsxDEV(Play, { fill: "currentColor" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 31,
+        columnNumber: 229
+      }, this) }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 31,
+        columnNumber: 201
+      }, this),
+      movie.quality && /* @__PURE__ */ jsxDEV("b", { children: movie.quality }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 31,
+        columnNumber: 282
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 31,
+      columnNumber: 113
+    }, this),
+    /* @__PURE__ */ jsxDEV("h3", { children: movie.name }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 31,
+      columnNumber: 311
+    }, this),
+    /* @__PURE__ */ jsxDEV("p", { children: [
+      /* @__PURE__ */ jsxDEV("span", { children: movie.year || "--" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 31,
+        columnNumber: 335
+      }, this),
+      movie.rating && /* @__PURE__ */ jsxDEV(Fragment, { children: [
+        /* @__PURE__ */ jsxDEV(Star, { size: 13, fill: "currentColor" }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 31,
+          columnNumber: 387
+        }, this),
+        movie.rating.toFixed(1)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 31,
+        columnNumber: 385
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 31,
+      columnNumber: 332
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 31,
+    columnNumber: 56
+  }, this);
+}
+_c4 = MovieCard;
+function Skeletons() {
+  return /* @__PURE__ */ jsxDEV("div", { className: "movie-grid", children: Array.from({ length: 12 }).map((_, i) => /* @__PURE__ */ jsxDEV("div", { className: "skeleton-card", children: [
+    /* @__PURE__ */ jsxDEV("i", {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 32,
+      columnNumber: 139
+    }, this),
+    /* @__PURE__ */ jsxDEV("b", {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 32,
+      columnNumber: 144
+    }, this),
+    /* @__PURE__ */ jsxDEV("span", {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 32,
+      columnNumber: 149
+    }, this)
+  ] }, i, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 32,
+    columnNumber: 100
+  }, this)) }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 32,
+    columnNumber: 30
+  }, this);
+}
+_c5 = Skeletons;
+function SyncPanel() {
+  _s2();
+  const { data } = useGetSyncQuery(void 0, { pollingInterval: 3e3 });
+  const [start, { isLoading }] = useStartSyncMutation();
+  const working = data?.status === "running";
+  return /* @__PURE__ */ jsxDEV("section", { className: "sync-panel", children: [
+    /* @__PURE__ */ jsxDEV("div", { children: [
+      /* @__PURE__ */ jsxDEV(RefreshCw, { className: working ? "spin" : "" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 33,
+        columnNumber: 241
+      }, this),
+      /* @__PURE__ */ jsxDEV("span", { children: [
+        /* @__PURE__ */ jsxDEV("b", { children: working ? "Đang đồng bộ thư viện" : "Cập nhật thư viện" }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 33,
+          columnNumber: 294
+        }, this),
+        /* @__PURE__ */ jsxDEV("small", { children: working ? `${data.processed || 0} phim · trang ${data.page || 0}/${data.totalPages || "?"}` : "Lấy phim mới và tập phim từ VSMOV" }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 33,
+          columnNumber: 358
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 33,
+        columnNumber: 288
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 33,
+      columnNumber: 236
+    }, this),
+    /* @__PURE__ */ jsxDEV("button", { disabled: working || isLoading, onClick: () => start({ pages: 3 }), children: "Đồng bộ" }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 33,
+      columnNumber: 517
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 33,
+    columnNumber: 204
+  }, this);
+}
+_s2(SyncPanel, "Lzo8rRXvH0BDNWpz+jnDsJrsKqo=", false, function() {
+  return [useGetSyncQuery, useStartSyncMutation];
+});
+_c6 = SyncPanel;
+function Home() {
+  _s3();
+  const { data, isLoading } = useGetMoviesQuery({ page: 1 });
+  const movies = data?.items ?? [];
+  const hero = movies[0];
+  const popular = useMemo(() => [...movies].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 12), [movies]);
+  return /* @__PURE__ */ jsxDEV(Shell, { children: [
+    hero && /* @__PURE__ */ jsxDEV("section", { className: "hero", style: { backgroundImage: `linear-gradient(90deg,rgba(7,7,8,.96) 0%,rgba(7,7,8,.65) 42%,rgba(7,7,8,.08) 75%),linear-gradient(0deg,#09090a 0%,transparent 36%),url("${image(hero, true)}")` }, children: /* @__PURE__ */ jsxDEV("div", { className: "hero-copy", children: [
+      /* @__PURE__ */ jsxDEV("span", { className: "eyebrow", children: "Mới cập nhật" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 521
+      }, this),
+      /* @__PURE__ */ jsxDEV("h1", { children: hero.name }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 566
+      }, this),
+      /* @__PURE__ */ jsxDEV("p", { className: "hero-origin", children: hero.originName }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 586
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "meta", children: [
+        hero.rating && /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(Star, { fill: "currentColor" }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 34,
+            columnNumber: 678
+          }, this),
+          " ",
+          hero.rating.toFixed(1)
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 672
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: hero.year }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 739
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: hero.quality }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 763
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: hero.type === "series" ? "Phim bộ" : "Phim lẻ" }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 790
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 634
+      }, this),
+      /* @__PURE__ */ jsxDEV("p", { className: "description", children: clean(hero.description) || `Khám phá ${hero.name} và tiếp tục hành trình điện ảnh ngay trên màn hình của bạn.` }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 857
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "hero-actions", children: [
+        /* @__PURE__ */ jsxDEV(Link, { className: "primary", to: `/movie/${hero.slug}`, children: [
+          /* @__PURE__ */ jsxDEV(Play, { fill: "currentColor" }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 34,
+            columnNumber: 1083
+          }, this),
+          "Xem ngay"
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 1030
+        }, this),
+        /* @__PURE__ */ jsxDEV(Link, { className: "secondary", to: `/movie/${hero.slug}`, children: [
+          /* @__PURE__ */ jsxDEV(Info, {}, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 34,
+            columnNumber: 1181
+          }, this),
+          "Chi tiết"
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 1126
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 1e3
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 34,
+      columnNumber: 494
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 34,
+      columnNumber: 278
+    }, this),
+    !hero && /* @__PURE__ */ jsxDEV("div", { className: "empty-hero", children: [
+      /* @__PURE__ */ jsxDEV(Clapperboard, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 1265
+      }, this),
+      /* @__PURE__ */ jsxDEV("h1", { children: "Rạp phim của bạn đang sẵn sàng" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 1281
+      }, this),
+      /* @__PURE__ */ jsxDEV("p", { children: "Đồng bộ danh mục để bắt đầu xây dựng thư viện cá nhân." }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 1320
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 34,
+      columnNumber: 1237
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "content", children: [
+      /* @__PURE__ */ jsxDEV(SyncPanel, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 1413
+      }, this),
+      isLoading ? /* @__PURE__ */ jsxDEV(Skeletons, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 1439
+      }, this) : /* @__PURE__ */ jsxDEV(Fragment, { children: [
+        /* @__PURE__ */ jsxDEV(Row, { title: "Mới cập nhật", movies }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 1457
+        }, this),
+        /* @__PURE__ */ jsxDEV(Row, { title: "Được đánh giá cao", movies: popular }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 34,
+          columnNumber: 1501
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 34,
+        columnNumber: 1455
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 34,
+      columnNumber: 1388
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 34,
+    columnNumber: 262
+  }, this);
+}
+_s3(Home, "uYoNyvuLG3XN4RyJ31MLBJBhWWc=", false, function() {
+  return [useGetMoviesQuery];
+});
+_c7 = Home;
+function Row({ title, movies }) {
+  return /* @__PURE__ */ jsxDEV("section", { className: "shelf", children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "section-title", children: [
+      /* @__PURE__ */ jsxDEV("h2", { children: title }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 35,
+        columnNumber: 133
+      }, this),
+      /* @__PURE__ */ jsxDEV(Link, { to: "/search", children: [
+        "Xem tất cả ",
+        /* @__PURE__ */ jsxDEV(ChevronRight, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 35,
+          columnNumber: 179
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 35,
+        columnNumber: 149
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 35,
+      columnNumber: 102
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "movie-row", children: movies.map((m) => /* @__PURE__ */ jsxDEV(MovieCard, { movie: m }, m.id, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 35,
+      columnNumber: 254
+    }, this)) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 35,
+      columnNumber: 208
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 35,
+    columnNumber: 75
+  }, this);
+}
+_c8 = Row;
+function Detail() {
+  _s4();
+  const { slug = "" } = useParams();
+  const { data, isLoading } = useGetMovieQuery(slug);
+  if (isLoading) return /* @__PURE__ */ jsxDEV(Shell, { children: /* @__PURE__ */ jsxDEV("div", { className: "center", children: /* @__PURE__ */ jsxDEV(LoaderCircle, { className: "spin" }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 36,
+    columnNumber: 164
+  }, this) }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 36,
+    columnNumber: 140
+  }, this) }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 36,
+    columnNumber: 133
+  }, this);
+  const movie = data?.movie;
+  if (!movie) return /* @__PURE__ */ jsxDEV(Shell, { children: /* @__PURE__ */ jsxDEV(NotFound, {}, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 36,
+    columnNumber: 264
+  }, this) }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 36,
+    columnNumber: 257
+  }, this);
+  return /* @__PURE__ */ jsxDEV(Shell, { children: [
+    /* @__PURE__ */ jsxDEV("section", { className: "detail-hero", style: { backgroundImage: `linear-gradient(90deg,#080809 4%,rgba(8,8,9,.82) 48%,rgba(8,8,9,.18)),linear-gradient(0deg,#080809,transparent 45%),url("${image(movie, true)}")` }, children: [
+      /* @__PURE__ */ jsxDEV("button", { className: "back", onClick: () => history.back(), children: [
+        /* @__PURE__ */ jsxDEV(ChevronLeft, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 564
+        }, this),
+        "Quay lại"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 36,
+        columnNumber: 508
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "detail-copy", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "eyebrow", children: movie.type === "series" ? "Series" : "Movie" }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 625
+        }, this),
+        /* @__PURE__ */ jsxDEV("h1", { children: movie.name }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 704
+        }, this),
+        /* @__PURE__ */ jsxDEV("p", { className: "hero-origin", children: movie.originName }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 725
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "meta", children: [
+          /* @__PURE__ */ jsxDEV("span", { children: [
+            /* @__PURE__ */ jsxDEV(Star, { fill: "currentColor" }, void 0, false, {
+              fileName: "D:/app xem film/apps/web/src/App.tsx",
+              lineNumber: 36,
+              columnNumber: 802
+            }, this),
+            movie.rating?.toFixed(1) || "N/A"
+          ] }, void 0, true, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 796
+          }, this),
+          /* @__PURE__ */ jsxDEV("span", { children: movie.year }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 872
+          }, this),
+          /* @__PURE__ */ jsxDEV("span", { children: movie.duration && `${movie.duration} phút` }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 897
+          }, this),
+          /* @__PURE__ */ jsxDEV("span", { children: movie.quality }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 954
+          }, this),
+          /* @__PURE__ */ jsxDEV("span", { children: movie.language }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 982
+          }, this)
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 774
+        }, this),
+        /* @__PURE__ */ jsxDEV("p", { className: "description", children: clean(movie.description) || "Chưa có mô tả cho phim này." }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 1017
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "hero-actions", children: [
+          movie.episodes?.[0] ? /* @__PURE__ */ jsxDEV(Link, { className: "primary", to: `/watch/${movie.slug}/${movie.episodes[0].id}`, children: [
+            /* @__PURE__ */ jsxDEV(Play, { fill: "currentColor" }, void 0, false, {
+              fileName: "D:/app xem film/apps/web/src/App.tsx",
+              lineNumber: 36,
+              columnNumber: 1238
+            }, this),
+            "Xem ngay"
+          ] }, void 0, true, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1160
+          }, this) : /* @__PURE__ */ jsxDEV("button", { className: "primary", disabled: true, children: [
+            /* @__PURE__ */ jsxDEV(Play, {}, void 0, false, {
+              fileName: "D:/app xem film/apps/web/src/App.tsx",
+              lineNumber: 36,
+              columnNumber: 1321
+            }, this),
+            "Chưa có tập"
+          ] }, void 0, true, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1284
+          }, this),
+          /* @__PURE__ */ jsxDEV(Favorite, { movieId: movie.id }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1350
+          }, this)
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 1107
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 36,
+        columnNumber: 596
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 36,
+      columnNumber: 299
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "content detail-content", children: [
+      /* @__PURE__ */ jsxDEV(EpisodeList, { movie }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 36,
+        columnNumber: 1443
+      }, this),
+      /* @__PURE__ */ jsxDEV("section", { className: "info-grid", children: [
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("h2", { children: "Thông tin" }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1508
+          }, this),
+          /* @__PURE__ */ jsxDEV(InfoLine, { title: "Thể loại", value: movie.genres.join(", ") }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1526
+          }, this),
+          /* @__PURE__ */ jsxDEV(InfoLine, { title: "Quốc gia", value: movie.countries.join(", ") }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1587
+          }, this),
+          /* @__PURE__ */ jsxDEV(InfoLine, { title: "Đạo diễn", value: movie.directors.join(", ") }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1651
+          }, this)
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 1503
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("h2", { children: "Diễn viên" }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1726
+          }, this),
+          /* @__PURE__ */ jsxDEV("p", { children: movie.actors.slice(0, 12).join(", ") || "Đang cập nhật" }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 36,
+            columnNumber: 1744
+          }, this)
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 36,
+          columnNumber: 1721
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 36,
+        columnNumber: 1472
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 36,
+      columnNumber: 1403
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 36,
+    columnNumber: 292
+  }, this);
+}
+_s4(Detail, "Jw2GoG1S4f6bLZFx47+RrzaZzLU=", false, function() {
+  return [useParams, useGetMovieQuery];
+});
+_c9 = Detail;
+function Favorite({ movieId }) {
+  _s5();
+  const { data } = useGetFavoriteQuery(movieId);
+  const [setFavorite, { isLoading }] = useSetFavoriteMutation();
+  const active = Boolean(data?.favorite);
+  return /* @__PURE__ */ jsxDEV("button", { disabled: isLoading, className: `secondary ${active ? "active" : ""}`, onClick: () => setFavorite({ movieId, enabled: !active }), children: [
+    /* @__PURE__ */ jsxDEV(Heart, { fill: active ? "currentColor" : "none" }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 37,
+      columnNumber: 351
+    }, this),
+    active ? "Đã lưu" : "Yêu thích"
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 37,
+    columnNumber: 213
+  }, this);
+}
+_s5(Favorite, "Rct+JejlhLd8kR3+ba44nklQjUU=", false, function() {
+  return [useGetFavoriteQuery, useSetFavoriteMutation];
+});
+_c0 = Favorite;
+function EpisodeList({ movie }) {
+  _s6();
+  const groups = useMemo(() => Object.entries((movie.episodes ?? []).reduce((all, episode) => {
+    (all[episode.serverName] ??= []).push(episode);
+    return all;
+  }, {})), [movie.episodes]);
+  return /* @__PURE__ */ jsxDEV("section", { className: "episodes", children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "section-title", children: [
+      /* @__PURE__ */ jsxDEV("h2", { children: movie.type === "series" ? "Danh sách tập" : "Nguồn phát" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 38,
+        columnNumber: 330
+      }, this),
+      /* @__PURE__ */ jsxDEV("span", { children: [
+        movie.episodes?.length || 0,
+        " tập"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 38,
+        columnNumber: 397
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 38,
+      columnNumber: 299
+    }, this),
+    groups.length ? groups.map(([server, eps]) => /* @__PURE__ */ jsxDEV("div", { className: "server", children: [
+      /* @__PURE__ */ jsxDEV("h3", { children: server.trim() }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 38,
+        columnNumber: 533
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "episode-grid", children: eps.map((ep) => /* @__PURE__ */ jsxDEV(Link, { to: `/watch/${movie.slug}/${ep.id}`, children: [
+        /* @__PURE__ */ jsxDEV(Play, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 38,
+          columnNumber: 659
+        }, this),
+        ep.name
+      ] }, ep.id, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 38,
+        columnNumber: 604
+      }, this)) }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 38,
+        columnNumber: 557
+      }, this)
+    ] }, server, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 38,
+      columnNumber: 496
+    }, this)) : /* @__PURE__ */ jsxDEV("p", { className: "muted", children: "Nguồn chưa cung cấp tập phim." }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 38,
+      columnNumber: 701
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 38,
+    columnNumber: 269
+  }, this);
+}
+_s6(EpisodeList, "jtdUUc8lBEYbsvotqAwekbhnTK8=");
+_c1 = EpisodeList;
+function InfoLine({ title, value }) {
+  return /* @__PURE__ */ jsxDEV("p", { className: "info-line", children: [
+    /* @__PURE__ */ jsxDEV("b", { children: title }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 39,
+      columnNumber: 102
+    }, this),
+    /* @__PURE__ */ jsxDEV("span", { children: value || "Đang cập nhật" }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 39,
+      columnNumber: 116
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 39,
+    columnNumber: 77
+  }, this);
+}
+_c10 = InfoLine;
+function Watch() {
+  _s7();
+  const { slug = "", episodeId = "" } = useParams();
+  const { data } = useGetMovieQuery(slug);
+  const [save] = useSaveProgressMutation();
+  const movie = data?.movie;
+  const episode = movie?.episodes?.find((e) => e.id === Number(episodeId));
+  useEffect(() => {
+    if (!episode) return;
+    const started = Date.now();
+    return () => {
+      save({ episodeId: episode.id, position: Math.round((Date.now() - started) / 1e3), duration: 0 });
+    };
+  }, [episode?.id]);
+  if (!movie || !episode) return /* @__PURE__ */ jsxDEV("div", { className: "watch-loading", children: /* @__PURE__ */ jsxDEV(LoaderCircle, { className: "spin" }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 40,
+    columnNumber: 514
+  }, this) }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 40,
+    columnNumber: 483
+  }, this);
+  const episodes = movie.episodes ?? [];
+  const index = episodes.findIndex((e) => e.id === episode.id);
+  return /* @__PURE__ */ jsxDEV("div", { className: "watch-page", children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "watch-top", children: [
+      /* @__PURE__ */ jsxDEV(Link, { to: `/movie/${slug}`, children: [
+        /* @__PURE__ */ jsxDEV(ChevronLeft, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 40,
+          columnNumber: 743
+        }, this),
+        "Chi tiết phim"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 40,
+        columnNumber: 715
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("b", { children: movie.name }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 40,
+          columnNumber: 783
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          episode.serverName,
+          " · Tập ",
+          episode.name
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 40,
+          columnNumber: 802
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 40,
+        columnNumber: 778
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 40,
+      columnNumber: 688
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "player-frame", children: /* @__PURE__ */ jsxDEV("iframe", { src: episode.embedUrl, title: `${movie.name} - ${episode.name}`, allow: "autoplay; fullscreen; picture-in-picture", allowFullScreen: true, referrerPolicy: "no-referrer" }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 40,
+      columnNumber: 898
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 40,
+      columnNumber: 868
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "watch-controls", children: [
+      index > 0 ? /* @__PURE__ */ jsxDEV(Link, { to: `/watch/${slug}/${episodes[index - 1].id}`, children: [
+        /* @__PURE__ */ jsxDEV(ChevronLeft, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 40,
+          columnNumber: 1172
+        }, this),
+        "Tập trước"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 40,
+        columnNumber: 1118
+      }, this) : /* @__PURE__ */ jsxDEV("span", {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 40,
+        columnNumber: 1206
+      }, this),
+      /* @__PURE__ */ jsxDEV("button", { onClick: () => save({ episodeId: episode.id, position: 0, duration: 0, completed: true }), children: [
+        /* @__PURE__ */ jsxDEV(Clock3, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 40,
+          columnNumber: 1314
+        }, this),
+        "Đánh dấu đã xem"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 40,
+        columnNumber: 1215
+      }, this),
+      index < episodes.length - 1 ? /* @__PURE__ */ jsxDEV(Link, { to: `/watch/${slug}/${episodes[index + 1].id}`, children: [
+        "Tập sau",
+        /* @__PURE__ */ jsxDEV(ChevronRight, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 40,
+          columnNumber: 1440
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 40,
+        columnNumber: 1379
+      }, this) : /* @__PURE__ */ jsxDEV("span", {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 40,
+        columnNumber: 1466
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 40,
+      columnNumber: 1073
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 40,
+    columnNumber: 660
+  }, this);
+}
+_s7(Watch, "Is1BAqE1vfDcUJRw4XXBZ6LyAXQ=", false, function() {
+  return [useParams, useGetMovieQuery, useSaveProgressMutation];
+});
+_c11 = Watch;
+function SearchPage() {
+  _s8();
+  const [params, setParams] = useSearchParams();
+  const q = params.get("q") ?? "";
+  const [draft, setDraft] = useState(q);
+  const local = useGetMoviesQuery({ q, page: 1 });
+  const remote = useSearchVsmovQuery(q, { skip: q.length < 2 || Boolean(local.data?.items.length) });
+  const [importMovie] = useImportMovieMutation();
+  return /* @__PURE__ */ jsxDEV(Shell, { children: /* @__PURE__ */ jsxDEV("div", { className: "content search-page", children: [
+    /* @__PURE__ */ jsxDEV("form", { className: "search-large", onSubmit: (e) => {
+      e.preventDefault();
+      setParams(draft.trim() ? { q: draft.trim() } : {});
+    }, children: [
+      /* @__PURE__ */ jsxDEV(Search, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 513
+      }, this),
+      /* @__PURE__ */ jsxDEV("input", { autoFocus: true, value: draft, onChange: (e) => setDraft(e.target.value), placeholder: "Tên phim, diễn viên, đạo diễn..." }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 523
+      }, this),
+      /* @__PURE__ */ jsxDEV("button", { children: "Tìm kiếm" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 646
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 41,
+      columnNumber: 391
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "section-title", children: [
+      /* @__PURE__ */ jsxDEV("h1", { children: q ? `Kết quả cho “${q}”` : "Thư viện phim" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 709
+      }, this),
+      /* @__PURE__ */ jsxDEV("span", { children: [
+        local.data?.pagination.totalItems ?? 0,
+        " phim local"
+      ] }, void 0, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 762
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 41,
+      columnNumber: 678
+    }, this),
+    local.isLoading ? /* @__PURE__ */ jsxDEV(Skeletons, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 41,
+      columnNumber: 851
+    }, this) : local.data?.items.length ? /* @__PURE__ */ jsxDEV("div", { className: "movie-grid", children: local.data.items.map((m) => /* @__PURE__ */ jsxDEV(MovieCard, { movie: m }, m.id, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 41,
+      columnNumber: 951
+    }, this)) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 41,
+      columnNumber: 894
+    }, this) : q && remote.data?.items?.length ? /* @__PURE__ */ jsxDEV(Fragment, { children: [
+      /* @__PURE__ */ jsxDEV("p", { className: "muted", children: "Chưa có trong thư viện local. Chọn phim để nhập metadata và tập phim." }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 1032
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "remote-grid", children: remote.data.items.map((m) => /* @__PURE__ */ jsxDEV("button", { onClick: async () => {
+        await importMovie(m.slug);
+        location.href = `/movie/${m.slug}`;
+      }, children: [
+        /* @__PURE__ */ jsxDEV("img", { src: m.poster_url || m.thumb_url }, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 41,
+          columnNumber: 1297
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV("b", { children: m.name }, void 0, false, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 41,
+            columnNumber: 1344
+          }, this),
+          /* @__PURE__ */ jsxDEV("small", { children: [
+            m.origin_name,
+            " · ",
+            m.year
+          ] }, void 0, true, {
+            fileName: "D:/app xem film/apps/web/src/App.tsx",
+            lineNumber: 41,
+            columnNumber: 1359
+          }, this)
+        ] }, void 0, true, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 41,
+          columnNumber: 1338
+        }, this),
+        /* @__PURE__ */ jsxDEV(Bookmark, {}, void 0, false, {
+          fileName: "D:/app xem film/apps/web/src/App.tsx",
+          lineNumber: 41,
+          columnNumber: 1407
+        }, this)
+      ] }, m.slug, true, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 1190
+      }, this)) }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 1126
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 41,
+      columnNumber: 1030
+    }, this) : /* @__PURE__ */ jsxDEV("div", { className: "empty", children: [
+      /* @__PURE__ */ jsxDEV(Search, {}, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 1465
+      }, this),
+      /* @__PURE__ */ jsxDEV("h2", { children: "Không tìm thấy phim" }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 1475
+      }, this),
+      /* @__PURE__ */ jsxDEV("p", { children: "Thử tên khác hoặc đồng bộ thêm nội dung từ VSMOV." }, void 0, false, {
+        fileName: "D:/app xem film/apps/web/src/App.tsx",
+        lineNumber: 41,
+        columnNumber: 1503
+      }, this)
+    ] }, void 0, true, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 41,
+      columnNumber: 1442
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 41,
+    columnNumber: 354
+  }, this) }, void 0, false, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 41,
+    columnNumber: 347
+  }, this);
+}
+_s8(SearchPage, "aOj6fLL91LtCnla6uAqoiicCA3Q=", false, function() {
+  return [useSearchParams, useGetMoviesQuery, useSearchVsmovQuery, useImportMovieMutation];
+});
+_c12 = SearchPage;
+function NotFound() {
+  return /* @__PURE__ */ jsxDEV("div", { className: "empty", children: [
+    /* @__PURE__ */ jsxDEV(Film, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 42,
+      columnNumber: 52
+    }, this),
+    /* @__PURE__ */ jsxDEV("h2", { children: "Không tìm thấy nội dung" }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 42,
+      columnNumber: 60
+    }, this),
+    /* @__PURE__ */ jsxDEV(Link, { className: "primary", to: "/", children: "Về trang chủ" }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 42,
+      columnNumber: 92
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 42,
+    columnNumber: 29
+  }, this);
+}
+_c13 = NotFound;
+export default function App() {
+  return /* @__PURE__ */ jsxDEV(Routes, { children: [
+    /* @__PURE__ */ jsxDEV(Route, { path: "/", element: /* @__PURE__ */ jsxDEV(Home, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 72
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 47
+    }, this),
+    /* @__PURE__ */ jsxDEV(Route, { path: "/search", element: /* @__PURE__ */ jsxDEV(SearchPage, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 115
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 84
+    }, this),
+    /* @__PURE__ */ jsxDEV(Route, { path: "/movie/:slug", element: /* @__PURE__ */ jsxDEV(Detail, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 169
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 133
+    }, this),
+    /* @__PURE__ */ jsxDEV(Route, { path: "/watch/:slug/:episodeId", element: /* @__PURE__ */ jsxDEV(Watch, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 230
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 183
+    }, this),
+    /* @__PURE__ */ jsxDEV(Route, { path: "*", element: /* @__PURE__ */ jsxDEV(Shell, { children: /* @__PURE__ */ jsxDEV(NotFound, {}, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 275
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 268
+    }, this) }, void 0, false, {
+      fileName: "D:/app xem film/apps/web/src/App.tsx",
+      lineNumber: 43,
+      columnNumber: 243
+    }, this)
+  ] }, void 0, true, {
+    fileName: "D:/app xem film/apps/web/src/App.tsx",
+    lineNumber: 43,
+    columnNumber: 39
+  }, this);
+}
+_c14 = App;
+var _c, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c0, _c1, _c10, _c11, _c12, _c13, _c14;
+$RefreshReg$(_c, "Logo");
+$RefreshReg$(_c2, "Header");
+$RefreshReg$(_c3, "Shell");
+$RefreshReg$(_c4, "MovieCard");
+$RefreshReg$(_c5, "Skeletons");
+$RefreshReg$(_c6, "SyncPanel");
+$RefreshReg$(_c7, "Home");
+$RefreshReg$(_c8, "Row");
+$RefreshReg$(_c9, "Detail");
+$RefreshReg$(_c0, "Favorite");
+$RefreshReg$(_c1, "EpisodeList");
+$RefreshReg$(_c10, "InfoLine");
+$RefreshReg$(_c11, "Watch");
+$RefreshReg$(_c12, "SearchPage");
+$RefreshReg$(_c13, "NotFound");
+$RefreshReg$(_c14, "App");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("D:/app xem film/apps/web/src/App.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("D:/app xem film/apps/web/src/App.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QkFBZSxTQUFTLHVCQUFDLFlBQUQ7QUFBQTtBQUFBO0FBQUE7QUFBQSxXQUFPLEtBQTNDO0FBQUE7QUFBQTtBQUFBO0FBQUEsV0FBOEM7QUFBQSxJQUFFLHVCQUFDLFNBQU0sTUFBSywyQkFBMEIsU0FBUyx1QkFBQyxXQUFEO0FBQUE7QUFBQTtBQUFBO0FBQUEsV0FBTSxLQUFyRDtBQUFBO0FBQUE7QUFBQTtBQUFBLFdBQXdEO0FBQUEsSUFBRSx1QkFBQyxTQUFNLE1BQUssS0FBSSxTQUFTLHVCQUFDLFNBQU0saUNBQUMsY0FBRDtBQUFBO0FBQUE7QUFBQTtBQUFBLFdBQVMsS0FBaEI7QUFBQTtBQUFBO0FBQUE7QUFBQSxXQUFrQixLQUEzQztBQUFBO0FBQUE7QUFBQTtBQUFBLFdBQW9EO0FBQUEsT0FBeFA7QUFBQTtBQUFBO0FBQUE7QUFBQSxTQUEwUDtBQUFTO0FBQUNDLE9BQWpSRDtBQUFHLElBQUF2SSxJQUFBeUksS0FBQXpILEtBQUFRLEtBQUFRLEtBQUEwRyxLQUFBQyxLQUFBNUUsS0FBQTZFLEtBQUFDLEtBQUFDLEtBQUE1QyxNQUFBNkMsTUFBQUMsTUFBQVYsTUFBQUU7QUFBQSxhQUFBeEksSUFBQTtBQUFBLGFBQUF5SSxLQUFBO0FBQUEsYUFBQXpILEtBQUE7QUFBQSxhQUFBUSxLQUFBO0FBQUEsYUFBQVEsS0FBQTtBQUFBLGFBQUEwRyxLQUFBO0FBQUEsYUFBQUMsS0FBQTtBQUFBLGFBQUE1RSxLQUFBO0FBQUEsYUFBQTZFLEtBQUE7QUFBQSxhQUFBQyxLQUFBO0FBQUEsYUFBQUMsS0FBQTtBQUFBLGFBQUE1QyxNQUFBO0FBQUEsYUFBQTZDLE1BQUE7QUFBQSxhQUFBQyxNQUFBO0FBQUEsYUFBQVYsTUFBQTtBQUFBLGFBQUFFLE1BQUEiLCJuYW1lcyI6WyJ1c2VFZmZlY3QiLCJ1c2VNZW1vIiwidXNlU3RhdGUiLCJSb3V0ZXMiLCJSb3V0ZSIsIkxpbmsiLCJ1c2VOYXZpZ2F0ZSIsInVzZVBhcmFtcyIsInVzZVNlYXJjaFBhcmFtcyIsIkJvb2ttYXJrIiwiQ2hldnJvbkxlZnQiLCJDaGV2cm9uUmlnaHQiLCJDbGFwcGVyYm9hcmQiLCJDbG9jazMiLCJGaWxtIiwiSGVhcnQiLCJIb21lIiwiSG9tZUljb24iLCJJbmZvIiwiTG9hZGVyQ2lyY2xlIiwiTWVudSIsIlBsYXkiLCJSZWZyZXNoQ3ciLCJTZWFyY2giLCJTdGFyIiwiWCIsInVzZUdldEZhdm9yaXRlUXVlcnkiLCJ1c2VHZXRNb3ZpZVF1ZXJ5IiwidXNlR2V0TW92aWVzUXVlcnkiLCJ1c2VHZXRTeW5jUXVlcnkiLCJ1c2VJbXBvcnRNb3ZpZU11dGF0aW9uIiwidXNlU2F2ZVByb2dyZXNzTXV0YXRpb24iLCJ1c2VTZWFyY2hWc21vdlF1ZXJ5IiwidXNlU2V0RmF2b3JpdGVNdXRhdGlvbiIsInVzZVN0YXJ0U3luY011dGF0aW9uIiwiaW1hZ2UiLCJtb3ZpZSIsIndpZGUiLCJ0aHVtYlVybCIsInBvc3RlclVybCIsImNsZWFuIiwiaHRtbCIsInJlcGxhY2UiLCJ0cmltIiwiTG9nbyIsIl9jIiwiSGVhZGVyIiwiX3MiLCJuYXYiLCJvcGVuIiwic2V0T3BlbiIsInEiLCJzZXRRIiwic3VibWl0IiwiZSIsInByZXZlbnREZWZhdWx0IiwiZW5jb2RlVVJJQ29tcG9uZW50IiwidGFyZ2V0IiwidmFsdWUiLCJTaGVsbCIsImNoaWxkcmVuIiwiX2MzIiwiTW92aWVDYXJkIiwic2x1ZyIsIm5hbWUiLCJxdWFsaXR5IiwieWVhciIsInJhdGluZyIsInRvRml4ZWQiLCJfYzQiLCJTa2VsZXRvbnMiLCJBcnJheSIsImZyb20iLCJsZW5ndGgiLCJtYXAiLCJfIiwiaSIsIl9jNSIsIlN5bmNQYW5lbCIsIl9zMiIsImRhdGEiLCJ1bmRlZmluZWQiLCJwb2xsaW5nSW50ZXJ2YWwiLCJzdGFydCIsImlzTG9hZGluZyIsIndvcmtpbmciLCJzdGF0dXMiLCJwcm9jZXNzZWQiLCJwYWdlIiwidG90YWxQYWdlcyIsInBhZ2VzIiwiX3MzIiwibW92aWVzIiwiaXRlbXMiLCJoZXJvIiwicG9wdWxhciIsInNvcnQiLCJhIiwiYiIsInNsaWNlIiwiYmFja2dyb3VuZEltYWdlIiwib3JpZ2luTmFtZSIsInR5cGUiLCJkZXNjcmlwdGlvbiIsIlJvdyIsInRpdGxlIiwibSIsImlkIiwiX2M4IiwiRGV0YWlsIiwiX3M0IiwiaGlzdG9yeSIsImJhY2siLCJkdXJhdGlvbiIsImxhbmd1YWdlIiwiZXBpc29kZXMiLCJnZW5yZXMiLCJqb2luIiwiY291bnRyaWVzIiwiZGlyZWN0b3JzIiwiYWN0b3JzIiwiRmF2b3JpdGUiLCJtb3ZpZUlkIiwiX3M1Iiwic2V0RmF2b3JpdGUiLCJhY3RpdmUiLCJCb29sZWFuIiwiZmF2b3JpdGUiLCJlbmFibGVkIiwiRXBpc29kZUxpc3QiLCJfczYiLCJncm91cHMiLCJPYmplY3QiLCJlbnRyaWVzIiwicmVkdWNlIiwiYWxsIiwiZXBpc29kZSIsInNlcnZlck5hbWUiLCJwdXNoIiwic2VydmVyIiwiZXBzIiwiZXAiLCJJbmZvTGluZSIsIl9jMTAiLCJXYXRjaCIsIl9zNyIsImVwaXNvZGVJZCIsInNhdmUiLCJmaW5kIiwiTnVtYmVyIiwic3RhcnRlZCIsIkRhdGUiLCJub3ciLCJwb3NpdGlvbiIsIk1hdGgiLCJyb3VuZCIsImluZGV4IiwiZmluZEluZGV4IiwiZW1iZWRVcmwiLCJjb21wbGV0ZWQiLCJTZWFyY2hQYWdlIiwiX3M4IiwicGFyYW1zIiwic2V0UGFyYW1zIiwiZ2V0IiwiZHJhZnQiLCJzZXREcmFmdCIsImxvY2FsIiwicmVtb3RlIiwic2tpcCIsImltcG9ydE1vdmllIiwicGFnaW5hdGlvbiIsInRvdGFsSXRlbXMiLCJsb2NhdGlvbiIsImhyZWYiLCJwb3N0ZXJfdXJsIiwidGh1bWJfdXJsIiwib3JpZ2luX25hbWUiLCJOb3RGb3VuZCIsIl9jMTMiLCJBcHAiLCJfYzE0IiwiX2MyIiwiX2M2IiwiX2M3IiwiX2M5IiwiX2MwIiwiX2MxIiwiX2MxMSIsIl9jMTIiXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiQXBwLnRzeCJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyB1c2VFZmZlY3QsIHVzZU1lbW8sIHVzZVN0YXRlIH0gZnJvbSAncmVhY3QnO1xuaW1wb3J0IHsgUm91dGVzLFJvdXRlLExpbmssdXNlTmF2aWdhdGUsdXNlUGFyYW1zLHVzZVNlYXJjaFBhcmFtcyB9IGZyb20gJ3JlYWN0LXJvdXRlci1kb20nO1xuaW1wb3J0IHsgQm9va21hcmssQ2hldnJvbkxlZnQsQ2hldnJvblJpZ2h0LENsYXBwZXJib2FyZCxDbG9jazMsRmlsbSxIZWFydCxIb21lIGFzIEhvbWVJY29uLEluZm8sTG9hZGVyQ2lyY2xlLE1lbnUsUGxheSxSZWZyZXNoQ3csU2VhcmNoLFN0YXIsWCB9IGZyb20gJ2x1Y2lkZS1yZWFjdCc7XG5pbXBvcnQgeyB1c2VHZXRGYXZvcml0ZVF1ZXJ5LHVzZUdldE1vdmllUXVlcnksdXNlR2V0TW92aWVzUXVlcnksdXNlR2V0U3luY1F1ZXJ5LHVzZUltcG9ydE1vdmllTXV0YXRpb24sdXNlU2F2ZVByb2dyZXNzTXV0YXRpb24sdXNlU2VhcmNoVnNtb3ZRdWVyeSx1c2VTZXRGYXZvcml0ZU11dGF0aW9uLHVzZVN0YXJ0U3luY011dGF0aW9uIH0gZnJvbSAnLi9hcGknO1xuaW1wb3J0IHR5cGUgeyBFcGlzb2RlLE1vdmllIH0gZnJvbSAnLi90eXBlcyc7XG5cbmNvbnN0IGltYWdlPShtb3ZpZTpNb3ZpZSx3aWRlPWZhbHNlKT0+d2lkZT8obW92aWUudGh1bWJVcmx8fG1vdmllLnBvc3RlclVybCk6KG1vdmllLnBvc3RlclVybHx8bW92aWUudGh1bWJVcmwpO1xuY29uc3QgY2xlYW49KGh0bWw6c3RyaW5nfG51bGwpPT5odG1sP2h0bWwucmVwbGFjZSgvPFtePl0rPi9nLCcgJykucmVwbGFjZSgvXFxzKy9nLCcgJykudHJpbSgpOicnO1xuZnVuY3Rpb24gTG9nbygpe3JldHVybiA8TGluayBjbGFzc05hbWU9XCJsb2dvXCIgdG89XCIvXCI+PHNwYW4+PENsYXBwZXJib2FyZCBzaXplPXsyMn0vPjwvc3Bhbj5MT0NBTCBDSU5FTUE8L0xpbms+fVxuZnVuY3Rpb24gSGVhZGVyKCl7Y29uc3QgbmF2PXVzZU5hdmlnYXRlKCk7IGNvbnN0IFtvcGVuLHNldE9wZW5dPXVzZVN0YXRlKGZhbHNlKTsgY29uc3QgW3Esc2V0UV09dXNlU3RhdGUoJycpOyBjb25zdCBzdWJtaXQ9KGU6UmVhY3QuRm9ybUV2ZW50KT0+e2UucHJldmVudERlZmF1bHQoKTtpZihxLnRyaW0oKSluYXYoYC9zZWFyY2g/cT0ke2VuY29kZVVSSUNvbXBvbmVudChxLnRyaW0oKSl9YCl9O3JldHVybiA8aGVhZGVyPjxMb2dvLz48bmF2IGNsYXNzTmFtZT17b3Blbj8nb3Blbic6Jyd9PjxMaW5rIHRvPVwiL1wiPjxIb21lSWNvbi8+VHJhbmcgY2jhu6c8L0xpbms+PExpbmsgdG89XCIvc2VhcmNoXCI+PEZpbG0vPlRoxrAgdmnhu4duPC9MaW5rPjxidXR0b24gY2xhc3NOYW1lPVwibmF2LWNsb3NlXCIgb25DbGljaz17KCk9PnNldE9wZW4oZmFsc2UpfT48WC8+PC9idXR0b24+PC9uYXY+PGZvcm0gY2xhc3NOYW1lPVwic2VhcmNoLWJveFwiIG9uU3VibWl0PXtzdWJtaXR9PjxTZWFyY2gvPjxpbnB1dCB2YWx1ZT17cX0gb25DaGFuZ2U9e2U9PnNldFEoZS50YXJnZXQudmFsdWUpfSBwbGFjZWhvbGRlcj1cIlTDrG0gcGhpbS4uLlwiIGFyaWEtbGFiZWw9XCJUw6xtIHBoaW1cIi8+PC9mb3JtPjxidXR0b24gY2xhc3NOYW1lPVwiaWNvbi1idG4gbWVudS1idG5cIiBvbkNsaWNrPXsoKT0+c2V0T3Blbih0cnVlKX0gdGl0bGU9XCJN4bufIG1lbnVcIj48TWVudS8+PC9idXR0b24+PC9oZWFkZXI+fVxuZnVuY3Rpb24gU2hlbGwoe2NoaWxkcmVufTp7Y2hpbGRyZW46UmVhY3QuUmVhY3ROb2RlfSl7cmV0dXJuIDw+PEhlYWRlci8+PG1haW4+e2NoaWxkcmVufTwvbWFpbj48Zm9vdGVyPjxMb2dvLz48cD5UaMawIHZp4buHbiBwaGltIGPDoSBuaMOibiB0csOqbiBt4bqhbmcgbuG7mWkgYuG7mTwvcD48L2Zvb3Rlcj48Lz59XG5mdW5jdGlvbiBNb3ZpZUNhcmQoe21vdmllfTp7bW92aWU6TW92aWV9KXtyZXR1cm4gPExpbmsgY2xhc3NOYW1lPVwibW92aWUtY2FyZFwiIHRvPXtgL21vdmllLyR7bW92aWUuc2x1Z31gfT48ZGl2IGNsYXNzTmFtZT1cInBvc3RlclwiPjxpbWcgc3JjPXtpbWFnZShtb3ZpZSl8fCcnfSBhbHQ9e21vdmllLm5hbWV9IGxvYWRpbmc9XCJsYXp5XCIvPjxzcGFuIGNsYXNzTmFtZT1cImNhcmQtcGxheVwiPjxQbGF5IGZpbGw9XCJjdXJyZW50Q29sb3JcIi8+PC9zcGFuPnttb3ZpZS5xdWFsaXR5JiY8Yj57bW92aWUucXVhbGl0eX08L2I+fTwvZGl2PjxoMz57bW92aWUubmFtZX08L2gzPjxwPjxzcGFuPnttb3ZpZS55ZWFyfHwnLS0nfTwvc3Bhbj57bW92aWUucmF0aW5nJiY8PjxTdGFyIHNpemU9ezEzfSBmaWxsPVwiY3VycmVudENvbG9yXCIvPnttb3ZpZS5yYXRpbmcudG9GaXhlZCgxKX08Lz59PC9wPjwvTGluaz59XG5mdW5jdGlvbiBTa2VsZXRvbnMoKXtyZXR1cm4gPGRpdiBjbGFzc05hbWU9XCJtb3ZpZS1ncmlkXCI+e0FycmF5LmZyb20oe2xlbmd0aDoxMn0pLm1hcCgoXyxpKT0+PGRpdiBjbGFzc05hbWU9XCJza2VsZXRvbi1jYXJkXCIga2V5PXtpfT48aS8+PGIvPjxzcGFuLz48L2Rpdj4pfTwvZGl2Pn1cbmZ1bmN0aW9uIFN5bmNQYW5lbCgpe2NvbnN0IHtkYXRhfT11c2VHZXRTeW5jUXVlcnkodW5kZWZpbmVkLHtwb2xsaW5nSW50ZXJ2YWw6MzAwMH0pO2NvbnN0IFtzdGFydCx7aXNMb2FkaW5nfV09dXNlU3RhcnRTeW5jTXV0YXRpb24oKTtjb25zdCB3b3JraW5nPWRhdGE/LnN0YXR1cz09PSdydW5uaW5nJztyZXR1cm4gPHNlY3Rpb24gY2xhc3NOYW1lPVwic3luYy1wYW5lbFwiPjxkaXY+PFJlZnJlc2hDdyBjbGFzc05hbWU9e3dvcmtpbmc/J3NwaW4nOicnfS8+PHNwYW4+PGI+e3dvcmtpbmc/J8SQYW5nIMSR4buTbmcgYuG7mSB0aMawIHZp4buHbic6J0Phuq1wIG5o4bqtdCB0aMawIHZp4buHbid9PC9iPjxzbWFsbD57d29ya2luZz9gJHtkYXRhLnByb2Nlc3NlZHx8MH0gcGhpbSDCtyB0cmFuZyAke2RhdGEucGFnZXx8MH0vJHtkYXRhLnRvdGFsUGFnZXN8fCc/J31gOidM4bqleSBwaGltIG3hu5tpIHbDoCB04bqtcCBwaGltIHThu6sgVlNNT1YnfTwvc21hbGw+PC9zcGFuPjwvZGl2PjxidXR0b24gZGlzYWJsZWQ9e3dvcmtpbmd8fGlzTG9hZGluZ30gb25DbGljaz17KCk9PnN0YXJ0KHtwYWdlczozfSl9PsSQ4buTbmcgYuG7mTwvYnV0dG9uPjwvc2VjdGlvbj59XG5mdW5jdGlvbiBIb21lKCl7Y29uc3Qge2RhdGEsaXNMb2FkaW5nfT11c2VHZXRNb3ZpZXNRdWVyeSh7cGFnZToxfSk7Y29uc3QgbW92aWVzPWRhdGE/Lml0ZW1zPz9bXTtjb25zdCBoZXJvPW1vdmllc1swXTtjb25zdCBwb3B1bGFyPXVzZU1lbW8oKCk9PlsuLi5tb3ZpZXNdLnNvcnQoKGEsYik9PihiLnJhdGluZ3x8MCktKGEucmF0aW5nfHwwKSkuc2xpY2UoMCwxMiksW21vdmllc10pO3JldHVybiA8U2hlbGw+e2hlcm8mJjxzZWN0aW9uIGNsYXNzTmFtZT1cImhlcm9cIiBzdHlsZT17e2JhY2tncm91bmRJbWFnZTpgbGluZWFyLWdyYWRpZW50KDkwZGVnLHJnYmEoNyw3LDgsLjk2KSAwJSxyZ2JhKDcsNyw4LC42NSkgNDIlLHJnYmEoNyw3LDgsLjA4KSA3NSUpLGxpbmVhci1ncmFkaWVudCgwZGVnLCMwOTA5MGEgMCUsdHJhbnNwYXJlbnQgMzYlKSx1cmwoXCIke2ltYWdlKGhlcm8sdHJ1ZSl9XCIpYH19PjxkaXYgY2xhc3NOYW1lPVwiaGVyby1jb3B5XCI+PHNwYW4gY2xhc3NOYW1lPVwiZXllYnJvd1wiPk3hu5tpIGPhuq1wIG5o4bqtdDwvc3Bhbj48aDE+e2hlcm8ubmFtZX08L2gxPjxwIGNsYXNzTmFtZT1cImhlcm8tb3JpZ2luXCI+e2hlcm8ub3JpZ2luTmFtZX08L3A+PGRpdiBjbGFzc05hbWU9XCJtZXRhXCI+e2hlcm8ucmF0aW5nJiY8c3Bhbj48U3RhciBmaWxsPVwiY3VycmVudENvbG9yXCIvPiB7aGVyby5yYXRpbmcudG9GaXhlZCgxKX08L3NwYW4+fTxzcGFuPntoZXJvLnllYXJ9PC9zcGFuPjxzcGFuPntoZXJvLnF1YWxpdHl9PC9zcGFuPjxzcGFuPntoZXJvLnR5cGU9PT0nc2VyaWVzJz8nUGhpbSBi4buZJzonUGhpbSBs4bq7J308L3NwYW4+PC9kaXY+PHAgY2xhc3NOYW1lPVwiZGVzY3JpcHRpb25cIj57Y2xlYW4oaGVyby5kZXNjcmlwdGlvbil8fGBLaMOhbSBwaMOhICR7aGVyby5uYW1lfSB2w6AgdGnhur9wIHThu6VjIGjDoG5oIHRyw6xuaCDEkWnhu4duIOG6o25oIG5nYXkgdHLDqm4gbcOgbiBow6xuaCBj4bunYSBi4bqhbi5gfTwvcD48ZGl2IGNsYXNzTmFtZT1cImhlcm8tYWN0aW9uc1wiPjxMaW5rIGNsYXNzTmFtZT1cInByaW1hcnlcIiB0bz17YC9tb3ZpZS8ke2hlcm8uc2x1Z31gfT48UGxheSBmaWxsPVwiY3VycmVudENvbG9yXCIvPlhlbSBuZ2F5PC9MaW5rPjxMaW5rIGNsYXNzTmFtZT1cInNlY29uZGFyeVwiIHRvPXtgL21vdmllLyR7aGVyby5zbHVnfWB9PjxJbmZvLz5DaGkgdGnhur90PC9MaW5rPjwvZGl2PjwvZGl2Pjwvc2VjdGlvbj59eyFoZXJvJiY8ZGl2IGNsYXNzTmFtZT1cImVtcHR5LWhlcm9cIj48Q2xhcHBlcmJvYXJkLz48aDE+UuG6oXAgcGhpbSBj4bunYSBi4bqhbiDEkWFuZyBz4bq1biBzw6BuZzwvaDE+PHA+xJDhu5NuZyBi4buZIGRhbmggbeG7pWMgxJHhu4MgYuG6r3QgxJHhuqd1IHjDonkgZOG7sW5nIHRoxrAgdmnhu4duIGPDoSBuaMOibi48L3A+PC9kaXY+fTxkaXYgY2xhc3NOYW1lPVwiY29udGVudFwiPjxTeW5jUGFuZWwvPntpc0xvYWRpbmc/PFNrZWxldG9ucy8+Ojw+PFJvdyB0aXRsZT1cIk3hu5tpIGPhuq1wIG5o4bqtdFwiIG1vdmllcz17bW92aWVzfS8+PFJvdyB0aXRsZT1cIsSQxrDhu6NjIMSRw6FuaCBnacOhIGNhb1wiIG1vdmllcz17cG9wdWxhcn0vPjwvPn08L2Rpdj48L1NoZWxsPn1cbmZ1bmN0aW9uIFJvdyh7dGl0bGUsbW92aWVzfTp7dGl0bGU6c3RyaW5nO21vdmllczpNb3ZpZVtdfSl7cmV0dXJuIDxzZWN0aW9uIGNsYXNzTmFtZT1cInNoZWxmXCI+PGRpdiBjbGFzc05hbWU9XCJzZWN0aW9uLXRpdGxlXCI+PGgyPnt0aXRsZX08L2gyPjxMaW5rIHRvPVwiL3NlYXJjaFwiPlhlbSB04bqldCBj4bqjIDxDaGV2cm9uUmlnaHQvPjwvTGluaz48L2Rpdj48ZGl2IGNsYXNzTmFtZT1cIm1vdmllLXJvd1wiPnttb3ZpZXMubWFwKG09PjxNb3ZpZUNhcmQga2V5PXttLmlkfSBtb3ZpZT17bX0vPil9PC9kaXY+PC9zZWN0aW9uPn1cbmZ1bmN0aW9uIERldGFpbCgpe2NvbnN0IHtzbHVnPScnfT11c2VQYXJhbXMoKTtjb25zdCB7ZGF0YSxpc0xvYWRpbmd9PXVzZUdldE1vdmllUXVlcnkoc2x1Zyk7aWYoaXNMb2FkaW5nKXJldHVybiA8U2hlbGw+PGRpdiBjbGFzc05hbWU9XCJjZW50ZXJcIj48TG9hZGVyQ2lyY2xlIGNsYXNzTmFtZT1cInNwaW5cIi8+PC9kaXY+PC9TaGVsbD47Y29uc3QgbW92aWU9ZGF0YT8ubW92aWU7aWYoIW1vdmllKXJldHVybiA8U2hlbGw+PE5vdEZvdW5kLz48L1NoZWxsPjtyZXR1cm4gPFNoZWxsPjxzZWN0aW9uIGNsYXNzTmFtZT1cImRldGFpbC1oZXJvXCIgc3R5bGU9e3tiYWNrZ3JvdW5kSW1hZ2U6YGxpbmVhci1ncmFkaWVudCg5MGRlZywjMDgwODA5IDQlLHJnYmEoOCw4LDksLjgyKSA0OCUscmdiYSg4LDgsOSwuMTgpKSxsaW5lYXItZ3JhZGllbnQoMGRlZywjMDgwODA5LHRyYW5zcGFyZW50IDQ1JSksdXJsKFwiJHtpbWFnZShtb3ZpZSx0cnVlKX1cIilgfX0+PGJ1dHRvbiBjbGFzc05hbWU9XCJiYWNrXCIgb25DbGljaz17KCk9Pmhpc3RvcnkuYmFjaygpfT48Q2hldnJvbkxlZnQvPlF1YXkgbOG6oWk8L2J1dHRvbj48ZGl2IGNsYXNzTmFtZT1cImRldGFpbC1jb3B5XCI+PHNwYW4gY2xhc3NOYW1lPVwiZXllYnJvd1wiPnttb3ZpZS50eXBlPT09J3Nlcmllcyc/J1Nlcmllcyc6J01vdmllJ308L3NwYW4+PGgxPnttb3ZpZS5uYW1lfTwvaDE+PHAgY2xhc3NOYW1lPVwiaGVyby1vcmlnaW5cIj57bW92aWUub3JpZ2luTmFtZX08L3A+PGRpdiBjbGFzc05hbWU9XCJtZXRhXCI+PHNwYW4+PFN0YXIgZmlsbD1cImN1cnJlbnRDb2xvclwiLz57bW92aWUucmF0aW5nPy50b0ZpeGVkKDEpfHwnTi9BJ308L3NwYW4+PHNwYW4+e21vdmllLnllYXJ9PC9zcGFuPjxzcGFuPnttb3ZpZS5kdXJhdGlvbiYmYCR7bW92aWUuZHVyYXRpb259IHBow7p0YH08L3NwYW4+PHNwYW4+e21vdmllLnF1YWxpdHl9PC9zcGFuPjxzcGFuPnttb3ZpZS5sYW5ndWFnZX08L3NwYW4+PC9kaXY+PHAgY2xhc3NOYW1lPVwiZGVzY3JpcHRpb25cIj57Y2xlYW4obW92aWUuZGVzY3JpcHRpb24pfHwnQ2jGsGEgY8OzIG3DtCB04bqjIGNobyBwaGltIG7DoHkuJ308L3A+PGRpdiBjbGFzc05hbWU9XCJoZXJvLWFjdGlvbnNcIj57bW92aWUuZXBpc29kZXM/LlswXT88TGluayBjbGFzc05hbWU9XCJwcmltYXJ5XCIgdG89e2Avd2F0Y2gvJHttb3ZpZS5zbHVnfS8ke21vdmllLmVwaXNvZGVzWzBdLmlkfWB9PjxQbGF5IGZpbGw9XCJjdXJyZW50Q29sb3JcIi8+WGVtIG5nYXk8L0xpbms+OjxidXR0b24gY2xhc3NOYW1lPVwicHJpbWFyeVwiIGRpc2FibGVkPjxQbGF5Lz5DaMawYSBjw7MgdOG6rXA8L2J1dHRvbj59PEZhdm9yaXRlIG1vdmllSWQ9e21vdmllLmlkfS8+PC9kaXY+PC9kaXY+PC9zZWN0aW9uPjxkaXYgY2xhc3NOYW1lPVwiY29udGVudCBkZXRhaWwtY29udGVudFwiPjxFcGlzb2RlTGlzdCBtb3ZpZT17bW92aWV9Lz48c2VjdGlvbiBjbGFzc05hbWU9XCJpbmZvLWdyaWRcIj48ZGl2PjxoMj5UaMO0bmcgdGluPC9oMj48SW5mb0xpbmUgdGl0bGU9XCJUaOG7gyBsb+G6oWlcIiB2YWx1ZT17bW92aWUuZ2VucmVzLmpvaW4oJywgJyl9Lz48SW5mb0xpbmUgdGl0bGU9XCJRdeG7kWMgZ2lhXCIgdmFsdWU9e21vdmllLmNvdW50cmllcy5qb2luKCcsICcpfS8+PEluZm9MaW5lIHRpdGxlPVwixJDhuqFvIGRp4buFblwiIHZhbHVlPXttb3ZpZS5kaXJlY3RvcnMuam9pbignLCAnKX0vPjwvZGl2PjxkaXY+PGgyPkRp4buFbiB2acOqbjwvaDI+PHA+e21vdmllLmFjdG9ycy5zbGljZSgwLDEyKS5qb2luKCcsICcpfHwnxJBhbmcgY+G6rXAgbmjhuq10J308L3A+PC9kaXY+PC9zZWN0aW9uPjwvZGl2PjwvU2hlbGw+fVxuZnVuY3Rpb24gRmF2b3JpdGUoe21vdmllSWR9Onttb3ZpZUlkOm51bWJlcn0pe2NvbnN0IHtkYXRhfT11c2VHZXRGYXZvcml0ZVF1ZXJ5KG1vdmllSWQpO2NvbnN0IFtzZXRGYXZvcml0ZSx7aXNMb2FkaW5nfV09dXNlU2V0RmF2b3JpdGVNdXRhdGlvbigpO2NvbnN0IGFjdGl2ZT1Cb29sZWFuKGRhdGE/LmZhdm9yaXRlKTtyZXR1cm4gPGJ1dHRvbiBkaXNhYmxlZD17aXNMb2FkaW5nfSBjbGFzc05hbWU9e2BzZWNvbmRhcnkgJHthY3RpdmU/J2FjdGl2ZSc6Jyd9YH0gb25DbGljaz17KCk9PnNldEZhdm9yaXRlKHttb3ZpZUlkLGVuYWJsZWQ6IWFjdGl2ZX0pfT48SGVhcnQgZmlsbD17YWN0aXZlPydjdXJyZW50Q29sb3InOidub25lJ30vPnthY3RpdmU/J8SQw6MgbMawdSc6J1nDqnUgdGjDrWNoJ308L2J1dHRvbj59XG5mdW5jdGlvbiBFcGlzb2RlTGlzdCh7bW92aWV9Onttb3ZpZTpNb3ZpZX0pe2NvbnN0IGdyb3Vwcz11c2VNZW1vKCgpPT5PYmplY3QuZW50cmllcygobW92aWUuZXBpc29kZXM/P1tdKS5yZWR1Y2U8UmVjb3JkPHN0cmluZyxFcGlzb2RlW10+PigoYWxsLGVwaXNvZGUpPT57KGFsbFtlcGlzb2RlLnNlcnZlck5hbWVdPz89W10pLnB1c2goZXBpc29kZSk7cmV0dXJuIGFsbH0se30pKSxbbW92aWUuZXBpc29kZXNdKTtyZXR1cm4gPHNlY3Rpb24gY2xhc3NOYW1lPVwiZXBpc29kZXNcIj48ZGl2IGNsYXNzTmFtZT1cInNlY3Rpb24tdGl0bGVcIj48aDI+e21vdmllLnR5cGU9PT0nc2VyaWVzJz8nRGFuaCBzw6FjaCB04bqtcCc6J05ndeG7k24gcGjDoXQnfTwvaDI+PHNwYW4+e21vdmllLmVwaXNvZGVzPy5sZW5ndGh8fDB9IHThuq1wPC9zcGFuPjwvZGl2Pntncm91cHMubGVuZ3RoP2dyb3Vwcy5tYXAoKFtzZXJ2ZXIsZXBzXSk9PjxkaXYga2V5PXtzZXJ2ZXJ9IGNsYXNzTmFtZT1cInNlcnZlclwiPjxoMz57c2VydmVyLnRyaW0oKX08L2gzPjxkaXYgY2xhc3NOYW1lPVwiZXBpc29kZS1ncmlkXCI+e2Vwcy5tYXAoZXA9PjxMaW5rIGtleT17ZXAuaWR9IHRvPXtgL3dhdGNoLyR7bW92aWUuc2x1Z30vJHtlcC5pZH1gfT48UGxheS8+e2VwLm5hbWV9PC9MaW5rPil9PC9kaXY+PC9kaXY+KTo8cCBjbGFzc05hbWU9XCJtdXRlZFwiPk5ndeG7k24gY2jGsGEgY3VuZyBj4bqlcCB04bqtcCBwaGltLjwvcD59PC9zZWN0aW9uPn1cbmZ1bmN0aW9uIEluZm9MaW5lKHt0aXRsZSx2YWx1ZX06e3RpdGxlOnN0cmluZzt2YWx1ZTpzdHJpbmd9KXtyZXR1cm4gPHAgY2xhc3NOYW1lPVwiaW5mby1saW5lXCI+PGI+e3RpdGxlfTwvYj48c3Bhbj57dmFsdWV8fCfEkGFuZyBj4bqtcCBuaOG6rXQnfTwvc3Bhbj48L3A+fVxuZnVuY3Rpb24gV2F0Y2goKXtjb25zdCB7c2x1Zz0nJyxlcGlzb2RlSWQ9Jyd9PXVzZVBhcmFtcygpO2NvbnN0IHtkYXRhfT11c2VHZXRNb3ZpZVF1ZXJ5KHNsdWcpO2NvbnN0IFtzYXZlXT11c2VTYXZlUHJvZ3Jlc3NNdXRhdGlvbigpO2NvbnN0IG1vdmllPWRhdGE/Lm1vdmllO2NvbnN0IGVwaXNvZGU9bW92aWU/LmVwaXNvZGVzPy5maW5kKGU9PmUuaWQ9PT1OdW1iZXIoZXBpc29kZUlkKSk7dXNlRWZmZWN0KCgpPT57aWYoIWVwaXNvZGUpcmV0dXJuO2NvbnN0IHN0YXJ0ZWQ9RGF0ZS5ub3coKTtyZXR1cm4oKT0+e3NhdmUoe2VwaXNvZGVJZDplcGlzb2RlLmlkLHBvc2l0aW9uOk1hdGgucm91bmQoKERhdGUubm93KCktc3RhcnRlZCkvMTAwMCksZHVyYXRpb246MH0pfX0sW2VwaXNvZGU/LmlkXSk7aWYoIW1vdmllfHwhZXBpc29kZSlyZXR1cm4gPGRpdiBjbGFzc05hbWU9XCJ3YXRjaC1sb2FkaW5nXCI+PExvYWRlckNpcmNsZSBjbGFzc05hbWU9XCJzcGluXCIvPjwvZGl2Pjtjb25zdCBlcGlzb2Rlcz1tb3ZpZS5lcGlzb2Rlcz8/W107Y29uc3QgaW5kZXg9ZXBpc29kZXMuZmluZEluZGV4KGU9PmUuaWQ9PT1lcGlzb2RlLmlkKTtyZXR1cm4gPGRpdiBjbGFzc05hbWU9XCJ3YXRjaC1wYWdlXCI+PGRpdiBjbGFzc05hbWU9XCJ3YXRjaC10b3BcIj48TGluayB0bz17YC9tb3ZpZS8ke3NsdWd9YH0+PENoZXZyb25MZWZ0Lz5DaGkgdGnhur90IHBoaW08L0xpbms+PGRpdj48Yj57bW92aWUubmFtZX08L2I+PHNwYW4+e2VwaXNvZGUuc2VydmVyTmFtZX0gwrcgVOG6rXAge2VwaXNvZGUubmFtZX08L3NwYW4+PC9kaXY+PC9kaXY+PGRpdiBjbGFzc05hbWU9XCJwbGF5ZXItZnJhbWVcIj48aWZyYW1lIHNyYz17ZXBpc29kZS5lbWJlZFVybH0gdGl0bGU9e2Ake21vdmllLm5hbWV9IC0gJHtlcGlzb2RlLm5hbWV9YH0gYWxsb3c9XCJhdXRvcGxheTsgZnVsbHNjcmVlbjsgcGljdHVyZS1pbi1waWN0dXJlXCIgYWxsb3dGdWxsU2NyZWVuIHJlZmVycmVyUG9saWN5PVwibm8tcmVmZXJyZXJcIi8+PC9kaXY+PGRpdiBjbGFzc05hbWU9XCJ3YXRjaC1jb250cm9sc1wiPntpbmRleD4wPzxMaW5rIHRvPXtgL3dhdGNoLyR7c2x1Z30vJHtlcGlzb2Rlc1tpbmRleC0xXS5pZH1gfT48Q2hldnJvbkxlZnQvPlThuq1wIHRyxrDhu5tjPC9MaW5rPjo8c3Bhbi8+fTxidXR0b24gb25DbGljaz17KCk9PnNhdmUoe2VwaXNvZGVJZDplcGlzb2RlLmlkLHBvc2l0aW9uOjAsZHVyYXRpb246MCxjb21wbGV0ZWQ6dHJ1ZX0pfT48Q2xvY2szLz7EkMOhbmggZOG6pXUgxJHDoyB4ZW08L2J1dHRvbj57aW5kZXg8ZXBpc29kZXMubGVuZ3RoLTE/PExpbmsgdG89e2Avd2F0Y2gvJHtzbHVnfS8ke2VwaXNvZGVzW2luZGV4KzFdLmlkfWB9PlThuq1wIHNhdTxDaGV2cm9uUmlnaHQvPjwvTGluaz46PHNwYW4vPn08L2Rpdj48L2Rpdj59XG5mdW5jdGlvbiBTZWFyY2hQYWdlKCl7Y29uc3QgW3BhcmFtcyxzZXRQYXJhbXNdPXVzZVNlYXJjaFBhcmFtcygpO2NvbnN0IHE9cGFyYW1zLmdldCgncScpPz8nJztjb25zdCBbZHJhZnQsc2V0RHJhZnRdPXVzZVN0YXRlKHEpO2NvbnN0IGxvY2FsPXVzZUdldE1vdmllc1F1ZXJ5KHtxLHBhZ2U6MX0pO2NvbnN0IHJlbW90ZT11c2VTZWFyY2hWc21vdlF1ZXJ5KHEse3NraXA6cS5sZW5ndGg8Mnx8Qm9vbGVhbihsb2NhbC5kYXRhPy5pdGVtcy5sZW5ndGgpfSk7Y29uc3QgW2ltcG9ydE1vdmllXT11c2VJbXBvcnRNb3ZpZU11dGF0aW9uKCk7cmV0dXJuIDxTaGVsbD48ZGl2IGNsYXNzTmFtZT1cImNvbnRlbnQgc2VhcmNoLXBhZ2VcIj48Zm9ybSBjbGFzc05hbWU9XCJzZWFyY2gtbGFyZ2VcIiBvblN1Ym1pdD17ZT0+e2UucHJldmVudERlZmF1bHQoKTtzZXRQYXJhbXMoZHJhZnQudHJpbSgpP3txOmRyYWZ0LnRyaW0oKX06e30pfX0+PFNlYXJjaC8+PGlucHV0IGF1dG9Gb2N1cyB2YWx1ZT17ZHJhZnR9IG9uQ2hhbmdlPXtlPT5zZXREcmFmdChlLnRhcmdldC52YWx1ZSl9IHBsYWNlaG9sZGVyPVwiVMOqbiBwaGltLCBkaeG7hW4gdmnDqm4sIMSR4bqhbyBkaeG7hW4uLi5cIi8+PGJ1dHRvbj5Uw6xtIGtp4bq/bTwvYnV0dG9uPjwvZm9ybT48ZGl2IGNsYXNzTmFtZT1cInNlY3Rpb24tdGl0bGVcIj48aDE+e3E/YEvhur90IHF14bqjIGNobyDigJwke3F94oCdYDonVGjGsCB2aeG7h24gcGhpbSd9PC9oMT48c3Bhbj57bG9jYWwuZGF0YT8ucGFnaW5hdGlvbi50b3RhbEl0ZW1zPz8wfSBwaGltIGxvY2FsPC9zcGFuPjwvZGl2Pntsb2NhbC5pc0xvYWRpbmc/PFNrZWxldG9ucy8+OmxvY2FsLmRhdGE/Lml0ZW1zLmxlbmd0aD88ZGl2IGNsYXNzTmFtZT1cIm1vdmllLWdyaWRcIj57bG9jYWwuZGF0YS5pdGVtcy5tYXAobT0+PE1vdmllQ2FyZCBrZXk9e20uaWR9IG1vdmllPXttfS8+KX08L2Rpdj46cSYmcmVtb3RlLmRhdGE/Lml0ZW1zPy5sZW5ndGg/PD48cCBjbGFzc05hbWU9XCJtdXRlZFwiPkNoxrBhIGPDsyB0cm9uZyB0aMawIHZp4buHbiBsb2NhbC4gQ2jhu41uIHBoaW0gxJHhu4Mgbmjhuq1wIG1ldGFkYXRhIHbDoCB04bqtcCBwaGltLjwvcD48ZGl2IGNsYXNzTmFtZT1cInJlbW90ZS1ncmlkXCI+e3JlbW90ZS5kYXRhLml0ZW1zLm1hcCgobTphbnkpPT48YnV0dG9uIGtleT17bS5zbHVnfSBvbkNsaWNrPXthc3luYygpPT57YXdhaXQgaW1wb3J0TW92aWUobS5zbHVnKTtsb2NhdGlvbi5ocmVmPWAvbW92aWUvJHttLnNsdWd9YH19PjxpbWcgc3JjPXttLnBvc3Rlcl91cmx8fG0udGh1bWJfdXJsfS8+PHNwYW4+PGI+e20ubmFtZX08L2I+PHNtYWxsPnttLm9yaWdpbl9uYW1lfSDCtyB7bS55ZWFyfTwvc21hbGw+PC9zcGFuPjxCb29rbWFyay8+PC9idXR0b24+KX08L2Rpdj48Lz46PGRpdiBjbGFzc05hbWU9XCJlbXB0eVwiPjxTZWFyY2gvPjxoMj5LaMO0bmcgdMOsbSB0aOG6pXkgcGhpbTwvaDI+PHA+VGjhu60gdMOqbiBraMOhYyBob+G6t2MgxJHhu5NuZyBi4buZIHRow6ptIG7hu5lpIGR1bmcgdOG7qyBWU01PVi48L3A+PC9kaXY+fTwvZGl2PjwvU2hlbGw+fVxuZnVuY3Rpb24gTm90Rm91bmQoKXtyZXR1cm4gPGRpdiBjbGFzc05hbWU9XCJlbXB0eVwiPjxGaWxtLz48aDI+S2jDtG5nIHTDrG0gdGjhuqV5IG7hu5lpIGR1bmc8L2gyPjxMaW5rIGNsYXNzTmFtZT1cInByaW1hcnlcIiB0bz1cIi9cIj5W4buBIHRyYW5nIGNo4bunPC9MaW5rPjwvZGl2Pn1cbmV4cG9ydCBkZWZhdWx0IGZ1bmN0aW9uIEFwcCgpe3JldHVybiA8Um91dGVzPjxSb3V0ZSBwYXRoPVwiL1wiIGVsZW1lbnQ9ezxIb21lLz59Lz48Um91dGUgcGF0aD1cIi9zZWFyY2hcIiBlbGVtZW50PXs8U2VhcmNoUGFnZS8+fS8+PFJvdXRlIHBhdGg9XCIvbW92aWUvOnNsdWdcIiBlbGVtZW50PXs8RGV0YWlsLz59Lz48Um91dGUgcGF0aD1cIi93YXRjaC86c2x1Zy86ZXBpc29kZUlkXCIgZWxlbWVudD17PFdhdGNoLz59Lz48Um91dGUgcGF0aD1cIipcIiBlbGVtZW50PXs8U2hlbGw+PE5vdEZvdW5kLz48L1NoZWxsPn0vPjwvUm91dGVzPn1cbiJdLCJmaWxlIjoiRDovYXBwIHhlbSBmaWxtL2FwcHMvd2ViL3NyYy9BcHAudHN4In0=
