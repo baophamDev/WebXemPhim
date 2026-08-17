@@ -2,6 +2,10 @@
   "name": "bao-nhan-cinema",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=22 <25",
+    "npm": ">=10"
+  },
   "workspaces": ["apps/web", "services/api"],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace services/api\" \"npm run dev --workspace apps/web\"",
