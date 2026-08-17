@@ -1,15 +1,7 @@
+import type { CatalogFilters, CatalogProvider } from './providers/types.js';
+
 const base = (process.env.VSMOV_API_URL ?? 'https://vsmov.com/api').replace(/\/$/, '');
 const cache = new Map<string, { expires: number; value: unknown }>();
-
-export interface CatalogFilters {
-  page?: number;
-  limit?: number;
-  year?: string;
-  country?: string;
-  category?: string;
-  type?: string;
-  status?: string;
-}
 
 function queryString(filters: CatalogFilters & { keyword?: string }) {
   const query = new URLSearchParams();
@@ -27,7 +19,7 @@ async function request(path: string, ttlMs = 120_000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20_000);
   try {
-    const response = await fetch(key, { signal: controller.signal, headers: { accept: 'application/json', 'user-agent': 'LocalCinema/0.2' } });
+    const response = await fetch(key, { signal: controller.signal, headers: { accept: 'application/json', 'user-agent': 'BaoNhanCinema/0.2' } });
     if (!response.ok) throw new Error(`VSMOV HTTP ${response.status}`);
     const value = await response.json();
     cache.set(key, { expires: Date.now() + ttlMs, value });
@@ -37,7 +29,7 @@ async function request(path: string, ttlMs = 120_000) {
 
 function movieSummary(item: any) {
   return {
-    id: Number(item._id ?? 0), vsmovId: Number(item._id ?? 0) || null, slug: String(item.slug ?? ''),
+    id: Number(item._id ?? 0), provider: 'vsmov', providerId: item._id == null ? null : String(item._id), slug: String(item.slug ?? ''),
     name: String(item.name ?? item.origin_name ?? ''), originName: item.origin_name ?? null,
     description: item.content ?? null, type: item.type ?? item.tmdb?.type ?? 'single', status: item.status ?? null,
     year: Number(item.year ?? 0) || null, duration: item.time ?? null, quality: item.quality ?? null,
@@ -66,7 +58,8 @@ function normalizeTaxonomy(payload: any) {
 
 async function catalogList(path: string, filters: CatalogFilters = {}) { return normalizeList(await request(`${path}${queryString(filters)}`)); }
 
-export const vsmov = {
+export const vsmov: CatalogProvider = {
+  name: 'vsmov',
   latest: (page: number, limit = 24) => request(`/danh-sach/phim-moi-cap-nhat${queryString({ page, limit })}`),
   home: (filters: CatalogFilters = {}) => catalogList('/danh-sach/phim-moi-cap-nhat', filters),
   list: (slug: string, filters: CatalogFilters = {}) => catalogList(`/danh-sach/${encodeURIComponent(slug)}`, filters),

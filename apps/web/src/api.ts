@@ -3,6 +3,7 @@ import type { CatalogQuery, Episode, Movie, MovieList, SyncState, TaxonomyList }
 
 export const deviceId=localStorage.getItem('cinema-device-id')??crypto.randomUUID();
 localStorage.setItem('cinema-device-id',deviceId);
+const apiBaseUrl=(import.meta.env.VITE_API_URL??'/api').replace(/\/$/,'');
 
 function catalogUrl(kind:CatalogQuery['kind'],value?:string){
   if(kind==='home')return '/catalog/home';
@@ -12,7 +13,7 @@ function catalogUrl(kind:CatalogQuery['kind'],value?:string){
 
 export const cinemaApi=createApi({
   reducerPath:'cinemaApi',
-  baseQuery:fetchBaseQuery({baseUrl:'/api'}),
+  baseQuery:fetchBaseQuery({baseUrl:apiBaseUrl}),
   tagTypes:['Movie','Sync','Favorite','Progress','Health'],
   endpoints:(builder)=>({
     getCatalog:builder.query<MovieList,CatalogQuery>({query:({kind,value,...params})=>({url:catalogUrl(kind,value),params})}),

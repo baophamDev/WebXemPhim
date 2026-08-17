@@ -2,7 +2,8 @@ export type MovieType = 'single' | 'series' | string;
 
 export interface Movie {
   id: number;
-  vsmovId: number | null;
+  provider: string;
+  providerId: string | null;
   slug: string;
   name: string;
   originName: string | null;

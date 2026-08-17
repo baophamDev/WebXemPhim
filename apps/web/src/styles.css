@@ -6,3 +6,13 @@
 .nav-backdrop,.mobile-search{display:none}.sync-status.offline{border-left-color:#f3bb48}.sync-status.offline .sync-icon{color:#f3bb48}.compact-action{padding-inline:13px}body.menu-open{overflow:hidden}
 @media(max-width:780px){.header-search{display:none}.mobile-search{display:grid}.nav-backdrop.open{display:block;position:fixed;inset:0;z-index:55;border:0;background:rgba(0,0,0,.68);backdrop-filter:blur(3px)}.main-nav{inset:0 0 0 auto;width:min(86vw,360px);z-index:60;box-shadow:-20px 0 50px rgba(0,0,0,.5)}}
 @media(max-width:780px){.app-header{backdrop-filter:none}.main-nav{height:100dvh;background:#0c0c0e;overflow-y:auto}.nav-backdrop.open{height:100dvh}}
+
+/* Keep interactions responsive on low-power devices and large movie grids. */
+.app-header{backdrop-filter:none;background:rgba(9,9,11,.96)}
+.poster img,.continue-grid img{transition:transform .18s ease-out}
+.movie-card:hover .poster img,.movie-card:focus-visible .poster img{transform:scale(1.025);filter:none}
+.button.primary:hover{transform:none}
+.movie-row{-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+.movie-card,.poster{contain:layout paint}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+.player-frame video{width:100%;height:100%;display:block;background:#000;object-fit:contain}
