@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { CatalogQuery, Episode, Movie, MovieList, SyncState, TaxonomyList } from './types';
+import type { CatalogQuery, Episode, Movie, MovieList, Navigation, Person, PersonList, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
 export const deviceId=localStorage.getItem('cinema-device-id')??crypto.randomUUID();
 localStorage.setItem('cinema-device-id',deviceId);
@@ -20,8 +20,14 @@ export const cinemaApi=createApi({
     searchCatalog:builder.query<MovieList,{q:string;page?:number;limit?:number;type?:string;status?:string;year?:string}>({query:({q,...params})=>({url:'/catalog/search',params:{q,...params}})}),
     searchVsmov:builder.query<MovieList,{q:string;page?:number;limit?:number}>({query:({q,...params})=>({url:'/vsmov/search',params:{q,...params}})}),
     getTaxonomy:builder.query<TaxonomyList,'genres'|'countries'|'years'|'actors'|'codes'>({query:(kind)=>`/catalog/${kind}`}),
+    // Menu điều hướng đổi rất chậm — giữ cache 10 phút để không gọi lại mỗi lần đổi route.
+    getNavigation:builder.query<Navigation,void>({query:()=>'/catalog/navigation',keepUnusedDataFor:600}),
     getMovie:builder.query<{movie:Movie},string>({query:(slug)=>`/catalog/movies/${encodeURIComponent(slug)}`,providesTags:(_r,_e,slug)=>[{type:'Movie',id:slug}]}),
-    getLocalMovies:builder.query<MovieList,{page?:number;q?:string;genre?:string;sort?:string}>({query:(p)=>({url:'/movies',params:{page:p.page??1,limit:24,q:p.q,genre:p.genre,sort:p.sort}}),providesTags:['Movie']}),
+    getLocalMovies:builder.query<MovieList,{page?:number;limit?:number;q?:string;genre?:string;country?:string;year?:number;type?:string;person?:string;personKind?:'actor'|'director';sort?:string}>({query:(p)=>({url:'/movies',params:{...p,page:p.page??1,limit:p.limit??24}}),providesTags:['Movie']}),
+    // Tìm kiếm hợp nhất trên DB: một từ khoá trả về cả phim và người, không dấu.
+    searchAll:builder.query<UnifiedSearch,{q:string;page?:number;limit?:number}>({query:({q,...params})=>({url:'/search',params:{q,...params}})}),
+    getPeople:builder.query<PersonList,{q?:string;kind?:'actor'|'director';page?:number;limit?:number}>({query:(p)=>({url:'/people',params:{...p,page:p.page??1,limit:p.limit??60}})}),
+    getPerson:builder.query<{person:Person}&MovieList,{slug:string;page?:number;kind?:'actor'|'director'}>({query:({slug,...params})=>({url:`/people/${encodeURIComponent(slug)}`,params})}),
     getLocalMovie:builder.query<{movie:Movie},string>({query:(slug)=>`/movies/${encodeURIComponent(slug)}`,providesTags:(_r,_e,slug)=>[{type:'Movie',id:`local-${slug}`}] }),
     getEpisode:builder.query<Episode,number>({query:(id)=>`/episodes/${id}`}),
     getHealth:builder.query<{ok:boolean;service:string;time:string},void>({query:()=>'/health',providesTags:['Health']}),
@@ -36,4 +42,4 @@ export const cinemaApi=createApi({
   })
 });
 
-export const {useGetCatalogQuery,useSearchCatalogQuery,useSearchVsmovQuery,useGetTaxonomyQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;
+export const {useGetCatalogQuery,useSearchCatalogQuery,useSearchVsmovQuery,useGetTaxonomyQuery,useGetNavigationQuery,useSearchAllQuery,useGetPeopleQuery,useGetPersonQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;
