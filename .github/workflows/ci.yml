@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -6,10 +6,11 @@ on:
   pull_request:
     branches: [main]
 
-# Huỷ các lần chạy cũ khi push liên tiếp lên cùng một branch/PR
+# Huỷ các lần chạy PR cũ khi push liên tiếp. Với main thì không huỷ,
+# tránh cắt ngang một lần deploy đang chạy.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -47,3 +48,104 @@ jobs:
           path: apps/web/dist
           retention-days: 7
           if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # CD: chỉ chạy khi push vào main và job build đã pass.
+  # Trước khi bật, hãy TẮT auto-deploy phía Railway/Vercel để không deploy 2 lần.
+  # ---------------------------------------------------------------------------
+
+  deploy-api:
+    name: Deploy API (Railway)
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: deploy-api
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Thiếu secret thì bỏ qua thay vì fail với lỗi khó hiểu
+      - name: Check secrets
+        id: guard
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::Chưa có secret RAILWAY_TOKEN — bỏ qua deploy API."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node 22
+        if: steps.guard.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Railway CLI
+        if: steps.guard.outputs.ready == 'true'
+        run: npm i -g @railway/cli@4
+
+      # Railway build lại theo railway.json (nixpacks) rồi chạy healthcheck /api/health
+      - name: Deploy
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --ci --service "${{ vars.RAILWAY_SERVICE || 'api' }}"
+
+  deploy-web:
+    name: Deploy Web (Vercel)
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: deploy-web
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check secrets
+        id: guard
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::warning::Thiếu secret Vercel — bỏ qua deploy web."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node 22
+        if: steps.guard.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Vercel CLI
+        if: steps.guard.outputs.ready == 'true'
+        run: npm i -g vercel@48
+
+      # pull kéo env production của project về, nên VITE_* cấu hình trong Vercel vẫn áp dụng
+      - name: Deploy
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull --yes --environment=production --token="$TOKEN"
+          vercel build --prod --token="$TOKEN"
+          vercel deploy --prebuilt --prod --token="$TOKEN"

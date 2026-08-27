@@ -1,0 +1,57 @@
+# CI/CD
+
+Pipeline nằm ở `.github/workflows/ci.yml`, chạy trên GitHub Actions.
+
+## Luồng
+
+| Sự kiện | Chạy gì |
+|---|---|
+| PR vào `main` | `build` (typecheck + build) |
+| Push vào `main` | `build`, rồi `deploy-api` + `deploy-web` song song |
+
+Job `build` chạy `npm ci` → `npm run typecheck` → `npm run build` trên Node 22, và
+upload `apps/web/dist` làm artifact (giữ 7 ngày) để đối chiếu khi cần.
+
+Hai job deploy chỉ chạy khi push vào `main` và `build` đã pass. Cả hai dùng
+GitHub Environment `production`, nên có thể bật required reviewers trong
+*Settings → Environments → production* nếu muốn duyệt tay trước khi deploy.
+
+## Secrets cần khai báo
+
+Khai ở *Settings → Secrets and variables → Actions*. Nếu thiếu, job deploy tương ứng
+sẽ log warning và bỏ qua thay vì fail — CI vẫn xanh.
+
+**Railway (API)**
+
+- `RAILWAY_TOKEN` — project token, lấy ở Railway → project → Settings → Tokens.
+- Biến `RAILWAY_SERVICE` (Variables, không phải Secrets) — tên service, mặc định `api`.
+
+**Vercel (web)**
+
+- `VERCEL_TOKEN` — Account Settings → Tokens.
+- `VERCEL_ORG_ID` và `VERCEL_PROJECT_ID` — có trong `.vercel/project.json` sau khi chạy
+  `vercel link` ở máy local.
+
+Biến môi trường build của web (`VITE_API_URL`, ...) khai trong Vercel project settings;
+`vercel pull` sẽ kéo về nên không cần nhắc lại trong workflow.
+
+## Quan trọng: tắt auto-deploy phía provider
+
+Railway và Vercel mặc định tự deploy khi thấy commit mới trên `main`. Nếu để nguyên,
+mỗi lần push sẽ deploy hai lần (một từ provider, một từ Actions).
+
+- Railway: service → Settings → Source → tắt *Auto Deploy*.
+- Vercel: Project → Settings → Git → *Ignored Build Step* đặt `exit 0`, hoặc bỏ kết nối Git.
+
+Nếu muốn giữ auto-deploy của provider thì xoá hai job `deploy-api`/`deploy-web`
+và chỉ dùng CI làm cổng chặn lỗi.
+
+## Chạy thử ở local
+
+```bash
+npm ci
+npm run typecheck
+npm run build
+```
+
+Đây đúng là các bước job `build` thực hiện.
