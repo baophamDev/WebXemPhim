@@ -1,8 +1,28 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { CatalogQuery, Episode, Movie, MovieList, Navigation, Person, PersonList, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
-export const deviceId=localStorage.getItem('cinema-device-id')??crypto.randomUUID();
-localStorage.setItem('cinema-device-id',deviceId);
+/**
+ * crypto.randomUUID chỉ có trong secure context. Mở web qua IP LAN
+ * (http://192.168.x.x:5173) thì nó undefined, và vì dòng này chạy ở cấp module
+ * nên cả app sẽ trắng trang. Có fallback để mạng nội bộ vẫn dùng được.
+ */
+function newDeviceId(){
+  if(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')return crypto.randomUUID();
+  return `dev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
+}
+function readDeviceId(){
+  try{
+    const saved=localStorage.getItem('cinema-device-id');
+    if(saved)return saved;
+    const fresh=newDeviceId();
+    localStorage.setItem('cinema-device-id',fresh);
+    return fresh;
+  }catch{
+    // Chặn cookie/storage thì vẫn cho xem, chỉ mất tính năng "xem tiếp".
+    return newDeviceId();
+  }
+}
+export const deviceId=readDeviceId();
 const apiBaseUrl=(import.meta.env.VITE_API_URL??'/api').replace(/\/$/,'');
 
 function catalogUrl(kind:CatalogQuery['kind'],value?:string){
