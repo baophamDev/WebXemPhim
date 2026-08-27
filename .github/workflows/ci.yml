@@ -88,9 +88,10 @@ jobs:
         with:
           node-version: '22'
 
+      # TODO: pin version cụ thể (vd @railway/cli@3.x) sau lần chạy đầu thành công
       - name: Install Railway CLI
         if: steps.guard.outputs.ready == 'true'
-        run: npm i -g @railway/cli@4
+        run: npm i -g @railway/cli@latest
 
       # Railway build lại theo railway.json (nixpacks) rồi chạy healthcheck /api/health
       - name: Deploy
@@ -134,9 +135,10 @@ jobs:
         with:
           node-version: '22'
 
+      # TODO: pin version cụ thể sau lần chạy đầu thành công
       - name: Install Vercel CLI
         if: steps.guard.outputs.ready == 'true'
-        run: npm i -g vercel@48
+        run: npm i -g vercel@latest
 
       # pull kéo env production của project về, nên VITE_* cấu hình trong Vercel vẫn áp dụng
       - name: Deploy

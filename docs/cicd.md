@@ -55,3 +55,9 @@ npm run build
 ```
 
 Đây đúng là các bước job `build` thực hiện.
+
+## Việc còn lại sau lần chạy đầu
+
+Hai job deploy cài CLI bằng `@latest` vì chưa xác nhận được version nào đang ổn.
+Sau lần deploy thành công đầu tiên, xem log để biết version Railway CLI và Vercel CLI
+thực tế rồi pin lại trong workflow — tránh CI vỡ khi CLI ra bản major mới.
