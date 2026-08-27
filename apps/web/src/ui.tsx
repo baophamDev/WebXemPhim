@@ -82,22 +82,23 @@ function Header() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tên phim hoặc diễn viên" aria-label="Tìm phim hoặc diễn viên" />
       </form>
       <Link className="icon-button mobile-search" to="/search" aria-label="Tìm kiếm"><Search /></Link>
+      <Link className="icon-button desktop-icon" to="/library" aria-label="Thư viện của tôi"><Library /></Link>
       <button className="icon-button menu-button" onClick={() => setMenuOpen(true)} aria-label="Mở menu" aria-expanded={menuOpen}><Menu /></button>
     </div>
   </header>;
 }
 
 export function Shell({ children, flush = false }: { children: ReactNode; flush?: boolean }) {
-  return <>
+  return <div className={flush ? 'app-frame flush' : 'app-frame'}>
     <NavigationEffects />
     <Header />
     <main className={flush ? 'flush' : ''}>{children}</main>
     <footer>
       <Logo />
-      <p>Rạp phim riêng của gia đình</p>
+      <p>© {new Date().getFullYear()} BảoNhànCinema · Rạp phim riêng của gia đình</p>
       <div><Link to="/local">Kho đã lưu</Link><Link to="/people">Diễn viên</Link><Link to="/showtimes">Lịch phát hành</Link></div>
     </footer>
-  </>;
+  </div>;
 }
 
 /** Nhãn mục dạng "MỤC // TÊN" — nhất quán cho mọi tiêu đề trên trang. */

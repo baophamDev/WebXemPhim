@@ -70,7 +70,7 @@ export default function Detail() {
         <Breadcrumb items={[['Trang chủ', '/'], ['Khám phá', '/browse/list/phim-moi-cap-nhat'], [movie.name, '']]} />
         <div className="detail-copy">
           <RailLabel prefix="PHIM">{movie.type === 'series' ? 'Phim bộ' : 'Phim lẻ'}</RailLabel>
-          <h1 className="hero-title chrome-text" data-ghost={movie.name}><span>{movie.name}</span></h1>
+          <h1 className="hero-title detail">{movie.name}</h1>
           <p className="origin-name">{movie.originName}</p>
           <Spec movie={movie} />
           <p className="description">{clean(movie.description) || 'Chưa có mô tả.'}</p>
