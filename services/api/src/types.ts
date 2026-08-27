@@ -25,7 +25,24 @@ export interface Movie {
   countries: string[];
   actors: string[];
   directors: string[];
+  /** Diễn viên/đạo diễn kèm slug để link sang trang người. */
+  cast: CastMember[];
   episodes?: Episode[];
+}
+
+export interface CastMember {
+  name: string;
+  slug: string;
+  thumbUrl: string | null;
+  kind: 'actor' | 'director';
+}
+
+export interface Person {
+  id: number;
+  name: string;
+  slug: string;
+  thumbUrl: string | null;
+  movieCount: number;
 }
 
 export interface Episode {
