@@ -1,7 +1,20 @@
 node_modules/
 .tools/
 dist/
+*.tsbuildinfo
 *.db
 *.db-shm
 *.db-wal
 .env
+.env.local
+.env.*.local
+
+# Runtime artifacts: dev server logs, Chrome debug profiles, scratch dumps.
+# Không bao giờ commit — chứa dữ liệu phiên làm việc và có thể lẫn thông tin nhạy cảm.
+.runtime/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
