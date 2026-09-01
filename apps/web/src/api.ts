@@ -25,6 +25,24 @@ function readDeviceId(){
 export const deviceId=readDeviceId();
 const apiBaseUrl=(import.meta.env.VITE_API_URL??'/api').replace(/\/$/,'');
 
+/**
+ * Base URL tương đối ('/api') chỉ chạy được khi có proxy cùng origin: dev server
+ * của Vite proxy sang localhost:4000. Trên Vercel không có proxy nào — mọi
+ * đường dẫn bị rewrite về index.html, nên fetch '/api/health' nhận HTML và
+ * RTK Query báo lỗi parse; UI hiểu thành "API ngoại tuyến". Cảnh báo sớm ở
+ * console và cho SyncStatus hiện đúng nguyên nhân thay vì "cổng 4000".
+ */
+export const apiBaseIsRelative=!/^https?:\/\//i.test(apiBaseUrl);
+export function apiOfflineHint(){
+  const local=typeof location!=='undefined'&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if(apiBaseIsRelative&&!local)return 'VITE_API_URL đang là đường dẫn tương đối — cần trỏ sang URL API thật';
+  if(apiBaseIsRelative)return 'Không gọi được dịch vụ ở cổng 4000';
+  return `Không gọi được ${apiBaseUrl}`;
+}
+if(apiBaseIsRelative&&typeof location!=='undefined'&&!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)){
+  console.warn(`[api] VITE_API_URL="${apiBaseUrl}" là đường dẫn tương đối nhưng web không chạy ở localhost. Đặt VITE_API_URL thành URL đầy đủ của API (vd https://<app>.up.railway.app/api).`);
+}
+
 function catalogUrl(kind:CatalogQuery['kind'],value?:string){
   if(kind==='home')return '/catalog/home';
   const segment={list:'lists',genre:'genres',country:'countries',year:'years',code:'codes'}[kind];

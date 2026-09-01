@@ -12,10 +12,22 @@ import { slugifyName } from './text.js';
 import { syncLatest } from './sync.js';
 
 const app = express();
+/**
+ * Origin được phép gọi API. Ngoài danh sách cố định trong `WEB_ORIGIN`, cho phép
+ * luôn mọi domain `*.vercel.app` (bản production và các preview deployment sinh
+ * URL mới mỗi lần push) — nếu không, web trên Vercel bị CORS chặn và giao diện
+ * hiện "API ngoại tuyến" dù API vẫn sống.
+ */
 const allowedOrigins = (process.env.WEB_ORIGIN ?? 'http://localhost:5173').split(',').map((origin) => origin.trim()).filter(Boolean);
+const allowVercelPreview = process.env.ALLOW_VERCEL_PREVIEW !== 'false';
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.includes(origin)) return true;
+  if (!allowVercelPreview) return false;
+  try { return new URL(origin).hostname.endsWith('.vercel.app'); } catch { return false; }
+}
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
     callback(new Error('Origin is not allowed'));
   }
 }));
@@ -82,7 +94,10 @@ async function taxonomyWithFallback(
   };
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-cinema-api', provider: catalogProvider.name, time: new Date().toISOString() }));
+/** Trạng thái kết nối DB, do initDatabaseWithRetry() ở cuối file cập nhật. */
+export const dbState = { ready: false, error: null as string | null };
+
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-cinema-api', provider: catalogProvider.name, database: dbState.ready ? 'ready' : 'connecting', databaseError: dbState.error, time: new Date().toISOString() }));
 app.get('/api/catalog/home', asyncRoute(async (req, res) => res.json(await catalogProvider.home(queryFilters(req.query)))));
 app.get('/api/catalog/lists/:slug', asyncRoute(async (req, res) => res.json(await catalogProvider.list(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
 app.get('/api/catalog/search', asyncRoute(async (req, res) => res.json(await catalogProvider.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query)))));
@@ -209,10 +224,28 @@ app.use((error: any, _req: express.Request, res: express.Response, _next: expres
 });
 
 const port = Number(process.env.PORT ?? 4000); const host = process.env.HOST ?? '0.0.0.0';
-async function start() {
-  await initDatabase();
-  app.listen(port, host, () => console.log(`BaoNhanCinema API listening on http://${host}:${port}`));
+
+/**
+ * Trước đây `start()` chờ `initDatabase()` xong mới `listen()`. Supabase free tier
+ * tự ngủ sau vài ngày không dùng, nên một lần DNS/kết nối lỗi là API không mở cổng,
+ * healthcheck `/api/health` của Railway fail và toàn bộ web hiện "API ngoại tuyến".
+ * Giờ mở cổng trước rồi migrate ở nền, tự retry — API sống lại ngay khi DB tỉnh.
+ */
+async function initDatabaseWithRetry(attempt = 1): Promise<void> {
+  try {
+    await initDatabase();
+    dbState.ready = true; dbState.error = null;
+    console.log('Database ready');
+  } catch (error) {
+    dbState.ready = false; dbState.error = (error as Error).message;
+    const delay = Math.min(30_000, 2_000 * 2 ** (attempt - 1));
+    console.error(`Database init failed (lần ${attempt}), thử lại sau ${delay}ms:`, dbState.error);
+    setTimeout(() => void initDatabaseWithRetry(attempt + 1), delay).unref();
+  }
 }
 
-void start().catch((error) => { console.error('API startup failed:', error); process.exitCode = 1; });
+app.listen(port, host, () => {
+  console.log(`BaoNhanCinema API listening on http://${host}:${port}`);
+  void initDatabaseWithRetry();
+});
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => void closeDatabase().finally(() => process.exit(0)));

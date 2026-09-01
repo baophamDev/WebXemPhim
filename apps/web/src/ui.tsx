@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, Clapperboard, Compass, Film, Library, LoaderCircle, Menu, Play,
   RefreshCw, Search, Star, Users, WifiOff, X
 } from 'lucide-react';
-import { useGetHealthQuery, useGetSyncQuery, useStartSyncMutation } from './api';
+import { apiOfflineHint, useGetHealthQuery, useGetSyncQuery, useStartSyncMutation } from './api';
 import type { Movie } from './types';
 
 export const listLabels: Record<string, string> = {
@@ -203,7 +203,7 @@ export function SyncStatus() {
     <span className="sync-icon">{offline ? <WifiOff /> : <RefreshCw className={working ? 'spin' : ''} />}</span>
     <div>
       <b>{offline ? 'API ngoại tuyến' : working ? 'Đang cập nhật kho phim' : 'Kho phim đã lưu'}</b>
-      <small>{offline ? 'Không gọi được dịch vụ ở cổng 4000' : working ? `${data?.processed ?? 0} phim · trang ${data?.page ?? 0}/${data?.totalPages ?? '?'}` : `${data?.processed ?? 0} phim đã đồng bộ`}</small>
+      <small>{offline ? apiOfflineHint() : working ? `${data?.processed ?? 0} phim · trang ${data?.page ?? 0}/${data?.totalPages ?? '?'}` : `${data?.processed ?? 0} phim đã đồng bộ`}</small>
     </div>
     <button disabled={offline || working || isLoading} onClick={run}>{working ? 'Đang chạy' : 'Đồng bộ'}</button>
   </div>;
