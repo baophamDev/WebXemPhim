@@ -108,7 +108,9 @@ export function makePagination(input: {
   totalItems?: unknown; totalPages?: unknown; currentPage?: unknown; limit?: unknown; itemCount: number;
 }): Pagination {
   const limit = Math.max(1, Math.trunc(Number(input.limit) || 24));
-  const totalItems = Math.max(0, Math.trunc(Number(input.totalItems) ?? 0) || input.itemCount);
+  // `Math.trunc` luôn trả về number (NaN nếu nguồn gửi rác), nên `|| itemCount`
+  // là nhánh dự phòng duy nhất cần có — `?? 0` trước đây không bao giờ chạy tới.
+  const totalItems = Math.max(0, Math.trunc(Number(input.totalItems)) || input.itemCount);
   const totalPages = Math.max(1, Math.trunc(Number(input.totalPages) || Math.ceil(totalItems / limit) || 1));
   const currentPage = Math.min(totalPages, Math.max(1, Math.trunc(Number(input.currentPage) || 1)));
   return { totalItems, totalPages, currentPage, totalItemsPerPage: limit };

@@ -6,6 +6,102 @@
     <meta name="theme-color" content="#0b0806" />
     <meta name="description" content="Rạp phim riêng của gia đình: tìm phim theo tên, theo diễn viên, xem tiếp từ chỗ đang dở." />
     <title>BảoNhànCinema</title>
+
+    <!-- Mở sẵn kết nối tới API. Nó nằm ở origin khác (Railway) nên request đầu
+         tiên phải trả tiền DNS + TCP + TLS trước khi gửi được byte nào; làm sớm
+         ở đây thì khoản đó tiêu hoá xong trong lúc trình duyệt còn tải bundle.
+         Biến chưa đặt thì href thành đường dẫn tương đối và trình duyệt bỏ qua —
+         không có nhánh nào hỏng. -->
+    <link rel="preconnect" href="%VITE_API_URL%" crossorigin />
+
+    <!--
+      Bắn trước request dữ liệu của đúng trang đang mở, ngay lúc trình duyệt còn
+      đang đọc file HTML này.
+
+      Vì sao phải làm ở đây chứ không trong React: `main.tsx` là
+      <script type="module"> nên nó bị hoãn tới sau khi parse xong, rồi còn phải
+      tải bundle, chạy bundle, mount React — mãi tới đó RTK Query mới gọi API.
+      Nghĩa là **request nặng nhất của trang chỉ bắt đầu sau khi JS đã về máy**:
+      trên TV LG hay điện thoại yếu đó là 300–800ms đầu tiên trôi qua mà API còn
+      chưa nhận được câu hỏi. Mấy dòng dưới đây đẩy nó song song với việc tải
+      bundle, nên khi React mount thì câu trả lời thường đã nằm sẵn.
+
+      Đây là phần thật sự cắt được thời gian chờ mà không cần render ở server:
+      thứ chậm là *round-trip tới API*, không phải việc dựng HTML. Kết quả đi vào
+      `window.__BOOT__` và `src/boot.ts` nhặt lại — không khớp thì bundle cứ gọi
+      lại theo đường thường, hỏng nhất là tốn thêm một request.
+    -->
+    <script>
+      (function () {
+        // fetch/Promise thiếu (webOS 1–3, Chromium 38) thì bỏ qua cả khối này —
+        // đời máy đó cũng không nạp được <script type="module"> của bundle.
+        if (typeof fetch !== 'function' || typeof Promise !== 'function') return;
+
+        // Chuỗi bên dưới là biến VITE_API_URL, Vite thay lúc build. Comment này
+        // cố ý không viết lại đúng dạng %…% của nó: hook thay biến của Vite chạy
+        // trên toàn bộ file HTML với regex global, nên viết ra là comment cũng bị
+        // thay — đọc source trang đã build sẽ thấy một URL nằm giữa câu tiếng Việt.
+        // Không đặt biến thì Vite để nguyên chuỗi (và cảnh báo), nên phải tự nhận
+        // ra rồi lùi về '/api' — đúng cho dev, vì dev server proxy '/api' sang
+        // localhost:4000.
+        var base = '%VITE_API_URL%';
+        if (!base || base.charAt(0) === '%') base = '/api';
+        base = base.replace(/\/+$/, '');
+
+        // Nguồn ưu tiên: cùng khoá và cùng cách chuẩn hoá với src/source.ts.
+        var source = '';
+        try {
+          var saved = localStorage.getItem('cinema-source');
+          saved = saved ? saved.replace(/^\s+|\s+$/g, '').toLowerCase() : '';
+          if (saved && saved !== 'auto') source = 'source=' + encodeURIComponent(saved);
+        } catch (e) { /* chặn storage thì coi như đang ở 'auto' */ }
+        function withSource(url) {
+          if (!source) return url;
+          return url + (url.indexOf('?') < 0 ? '?' : '&') + source;
+        }
+
+        var queue = [];
+        function grab(url) {
+          var reply = fetch(url).then(function (res) {
+            return res.text().then(function (text) {
+              return { status: res.status, ok: res.ok, text: text };
+            });
+          });
+          // Nuốt lỗi ngay tại đây: request này là đầu cơ. Thất bại thì bundle tự
+          // gọi lại theo đường thường, còn không nuốt thì thành unhandled
+          // rejection đỏ console mà chẳng ai làm gì được.
+          reply['catch'](function () {});
+          queue.push({ url: url, at: Date.now(), promise: reply });
+        }
+        // Chuẩn hoá lại một đoạn đường dẫn cho khớp encodeURIComponent mà
+        // src/api.ts dùng (slug chỉ có [a-z0-9-] nên gần như luôn giống nhau).
+        function seg(value) {
+          try { return encodeURIComponent(decodeURIComponent(value)); }
+          catch (e) { return encodeURIComponent(value); }
+        }
+
+        var path = location.pathname.replace(/\/+$/, '') || '/';
+        var movie = /^\/movie\/([^/]+)$/.exec(path);
+        var watch = /^\/watch\/([^/]+)\/(\d+)$/.exec(path);
+        if (path === '/' || path === '/index.html') {
+          // Chỉ dải đầu (hero + "Vừa thêm vào kho"). Bốn dải còn lại nằm dưới
+          // màn hình đầu — bắn cả năm ở đây thì chúng giành băng thông với chính
+          // cái bundle đang cần về sớm. page/limit phải khớp useGetCatalogQuery
+          // trong src/pages/Home.tsx.
+          grab(withSource(base + '/catalog/home?page=1&limit=24'));
+        } else if (movie) {
+          grab(withSource(base + '/catalog/movies/' + seg(movie[1])));
+        } else if (watch) {
+          // Tập trước phim: /episodes/:id đọc một dòng và là thứ quyết định lúc
+          // khung hình đầu tiên hiện ra; /catalog/movies/:slug còn phải join
+          // phim + tập + người để dựng tiêu đề với danh sách tập.
+          grab(base + '/episodes/' + watch[2]);
+          grab(withSource(base + '/catalog/movies/' + seg(watch[1])));
+        }
+        if (queue.length) window.__BOOT__ = queue;
+      })();
+    </script>
+
     <!-- Font tải qua <link> chứ không @import trong CSS: @import chặn render vì
          trình duyệt phải tải xong CSS mới biết cần font nào.
          Anton chỉ dùng cho tiêu đề hero khổ lớn (có subset vietnamese). -->

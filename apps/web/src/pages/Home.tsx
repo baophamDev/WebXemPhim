@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
-import { clean, BackToTop, ErrorState, image, MovieRow, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus } from '../ui';
+import { clean, BackToTop, ErrorState, image, MovieRow, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
 import type { Movie } from '../types';
 
 /**
@@ -33,11 +33,12 @@ function FavoriteButton({ movie }: { movie: Movie }) {
 }
 
 function NextUp({ items }: { items: Movie[] }) {
+  const warm = useWarmDetail();
   if (!items.length) return null;
   return <div className="next-up">
     <RailLabel prefix="TIẾP THEO">Xem gì nữa</RailLabel>
     <div className="next-grid">
-      {items.map((movie) => <Link key={movie.slug} to={`/movie/${movie.slug}`} state={{ preview: movie }}>
+      {items.map((movie) => <Link key={movie.slug} to={`/movie/${movie.slug}`} state={{ preview: movie }} onPointerDown={warm(movie)}>
         <div><img src={image(movie, true) || '/poster-placeholder.svg'} alt={movie.name} loading="lazy" decoding="async" sizes="180px" /></div>
         <b>{movie.name}</b>
       </Link>)}
@@ -46,7 +47,13 @@ function NextUp({ items }: { items: Movie[] }) {
 }
 
 export default function Home() {
+  /**
+   * `page`/`limit` của dải đầu này phải khớp với request mà `index.html` bắn
+   * trước lúc còn đang parse HTML — lệch một con số là URL khác đi, câu trả lời
+   * bắn trước không được nhặt và trang chủ lại chờ một round-trip như cũ.
+   */
   const home = useGetCatalogQuery({ kind: 'home', page: 1, limit: 24 });
+  const warm = useWarmDetail();
   const series = useGetCatalogQuery({ kind: 'list', value: 'phim-bo', page: 1, limit: 12 });
   const movies = useGetCatalogQuery({ kind: 'list', value: 'phim-le', page: 1, limit: 12 });
   const ultra = useGetCatalogQuery({ kind: 'list', value: '4k', page: 1, limit: 12 });
@@ -75,8 +82,8 @@ export default function Home() {
               <Spec movie={featured} />
               <p className="description">{clean(featured.description) || `Xem ${featured.name} ngay trên kho phim của gia đình.`}</p>
               <div className="actions">
-                <Link className="button primary" to={`/movie/${featured.slug}`} state={{ preview: featured }}><Play fill="currentColor" />Phát</Link>
-                <Link className="button ghost" to={`/movie/${featured.slug}`} state={{ preview: featured }}><Film />Chi tiết</Link>
+                <Link className="button primary" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Play fill="currentColor" />Phát</Link>
+                <Link className="button ghost" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Film />Chi tiết</Link>
               </div>
               <NextUp items={next} />
             </aside>

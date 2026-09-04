@@ -9,6 +9,7 @@ import {
   saveProgress, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
 } from './db.js';
 import { describeFailure, shortCause } from './errors.js';
+import { asyncRoute, cachedRoute } from './http.js';
 import { forgetImport, importJob, importQueueSize, startImport, waitForImport, type ImportJob, type Report } from './importer.js';
 import { catalog, inactiveSources, type CatalogFilters } from './providers/index.js';
 import { streamRouter } from './stream.js';
@@ -46,9 +47,6 @@ app.use(cors({
   }
 }));
 app.use(express.json({ limit: '1mb' }));
-
-const asyncRoute = (handler: (req: express.Request, res: express.Response) => Promise<unknown>) =>
-  (req: express.Request, res: express.Response, next: express.NextFunction) => handler(req, res).catch(next);
 
 const filtersSchema = z.object({
   page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(48).default(24),
@@ -211,33 +209,42 @@ app.get('/api/providers', (_req, res) => res.json({
   order: catalog.names
 }));
 
-app.get('/api/catalog/home', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).home(queryFilters(req.query)))));
-app.get('/api/catalog/lists/:slug', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
-app.get('/api/catalog/search', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query)))));
-app.get('/api/catalog/genres', asyncRoute(async (req, res) => res.json(await taxonomyWithFallback(() => preferredCatalog(req).genres(), listGenresFromDb))));
-app.get('/api/catalog/genres/:slug', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
-app.get('/api/catalog/countries', asyncRoute(async (req, res) => res.json(await taxonomyWithFallback(() => preferredCatalog(req).countries(), listCountriesFromDb))));
-app.get('/api/catalog/countries/:slug', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
-app.get('/api/catalog/years', asyncRoute(async (req, res) => res.json(await taxonomyWithFallback(() => preferredCatalog(req).years(), listYearsFromDb))));
-app.get('/api/catalog/years/:year', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query)))));
+/**
+ * Danh sách phim và taxonomy đều là dữ liệu chung, không cá nhân hoá, và đổi vài
+ * lần một giờ là nhiều. Cho trình duyệt giữ lại một lúc: lần mở lại (F5, back,
+ * hay mở lại app trên TV) không phải chờ nguồn ngoài trả lời lần nữa.
+ *
+ * Danh mục (thể loại/quốc gia/năm/code) đổi cực chậm nên giữ 10 phút; danh sách
+ * phim 1 phút để "vừa thêm vào kho" không bị cũ tới mức nhìn ra được; tìm kiếm 30
+ * giây, đủ cho cú bấm back mà không ai kịp thấy kết quả lạc hậu.
+ *
+ * Ba đường **không** có ở đây là cố ý: `/catalog/movies/:slug` có thể trả 202
+ * "đang nhập" (cache lại là đóng băng đúng cái đang chạy), còn `/api/movies` với
+ * `/api/search` đọc DB của mình nên vốn đã nhanh.
+ */
+app.get('/api/catalog/home', cachedRoute(60, (req) => preferredCatalog(req).home(queryFilters(req.query))));
+app.get('/api/catalog/lists/:slug', cachedRoute(60, (req) => preferredCatalog(req).listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/search', cachedRoute(30, (req) => preferredCatalog(req).search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
+app.get('/api/catalog/genres', cachedRoute(600, (req) => taxonomyWithFallback(() => preferredCatalog(req).genres(), listGenresFromDb)));
+app.get('/api/catalog/genres/:slug', cachedRoute(60, (req) => preferredCatalog(req).byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/countries', cachedRoute(600, (req) => taxonomyWithFallback(() => preferredCatalog(req).countries(), listCountriesFromDb)));
+app.get('/api/catalog/countries/:slug', cachedRoute(60, (req) => preferredCatalog(req).byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/years', cachedRoute(600, (req) => taxonomyWithFallback(() => preferredCatalog(req).years(), listYearsFromDb)));
+app.get('/api/catalog/years/:year', cachedRoute(60, (req) => preferredCatalog(req).byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query))));
 
 // Một request cho toàn bộ menu điều hướng, thay vì 3 request song song lúc mở trang.
-app.get('/api/catalog/navigation', asyncRoute(async (req, res) => {
+app.get('/api/catalog/navigation', cachedRoute(600, async (req) => {
   const resolver = preferredCatalog(req);
   const [genres, countries, years] = await Promise.all([
     taxonomyWithFallback(() => resolver.genres(), listGenresFromDb),
     taxonomyWithFallback(() => resolver.countries(), listCountriesFromDb),
     taxonomyWithFallback(() => resolver.years(), listYearsFromDb)
   ]);
-  // Menu phụ thuộc nguồn đang chọn nên cache phải chia theo nguồn, không thì đổi
-  // nguồn mà CDN/proxy vẫn trả menu của nguồn cũ trong 10 phút.
-  res.header('Cache-Control', 'public, max-age=600');
-  res.header('Vary', 'Origin, x-catalog-source');
-  res.json({ genres: genres.items, countries: countries.items, years: years.items });
+  return { genres: genres.items, countries: countries.items, years: years.items };
 }));
 
-app.get('/api/catalog/codes', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).codes())));
-app.get('/api/catalog/codes/:code', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query)))));
+app.get('/api/catalog/codes', cachedRoute(600, (req) => preferredCatalog(req).codes()));
+app.get('/api/catalog/codes/:code', cachedRoute(60, (req) => preferredCatalog(req).byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query))));
 app.get('/api/catalog/movies/:slug', asyncRoute(async (req, res) => { await respondWithMovie(req, res, slugSchema.parse(req.params.slug)); }));
 
 const moviesQuerySchema = z.object({

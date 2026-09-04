@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react';
 import { apiBaseUrl, useGetEpisodeQuery, useGetMovieQuery, useSaveProgressMutation } from '../api';
+import { loadPlayerEngine } from '../chunks';
 import { previewFromState, recallMovie } from '../preview';
 import type { Episode } from '../types';
 import { ErrorState } from '../ui';
@@ -45,8 +46,10 @@ function VideoPlayer({ episode, title }: { episode: Episode; title: string }) {
     }
     let disposed = false;
     let destroy = () => {};
-    // hls.js chỉ tải khi thật sự cần phát HLS — nó nặng hơn cả phần còn lại của trang.
-    void import('hls.js').then(({ default: Hls }) => {
+    // hls.js chỉ tải khi thật sự cần phát HLS — nó nặng hơn cả phần còn lại của
+    // trang. Thường thì lúc chạy tới đây file đã nằm trong máy rồi: link tập ở
+    // trang chi tiết gọi `preloadPlayer()` ngay từ pointerdown.
+    void loadPlayerEngine().then(({ default: Hls }) => {
       if (disposed) return;
       if (!Hls.isSupported()) { setStage('embed'); return; }
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });

@@ -71,7 +71,7 @@ export default tseslint.config(
 
   // ---- Test: JS thuần, chạy bằng node --test -----------------------------
   {
-    files: ['services/api/test/**/*.js'],
+    files: ['services/api/test/**/*.js', 'apps/web/test/**/*.mjs'],
     extends: [js.configs.recommended],
     languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: globals.node },
     rules: { 'no-empty': ['error', { allowEmptyCatch: true }], 'prefer-const': 'error' }

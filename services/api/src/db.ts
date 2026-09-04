@@ -162,7 +162,11 @@ function mapMovie(row: any): Movie {
   };
 }
 
-type Executor = postgres.TransactionSql<{}>;
+/**
+ * `sql` bên trong một transaction. Bỏ trống tham số generic để lấy mặc định của
+ * thư viện (bảng kiểu tuỳ biến — mình không khai báo cái nào).
+ */
+type Executor = postgres.TransactionSql;
 
 /** Ghi tên phẳng vào bảng nối 1 lượt thay vì 1 INSERT/tên. */
 async function replaceNames(tx: Executor, table: 'movie_genres' | 'movie_countries', movieId: number, names: string[]) {

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { Heart, Play, RefreshCw, Users } from 'lucide-react';
 import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFavoriteMutation } from '../api';
+import { preloadPlayer } from '../chunks';
 import { previewFromState, recallMovie, rememberMovie } from '../preview';
 import type { CastMember, Episode, Movie } from '../types';
 import { Breadcrumb, clean, EmptyState, ErrorState, image, ImportPanel, RailLabel, Shell, Spec, useImportProgress } from '../ui';
@@ -35,7 +36,10 @@ function EpisodeList({ movie }: { movie: Movie }) {
     {groups.length ? groups.map(([server, episodes]) => <div className="server-group" key={server}>
       <h3>{server.trim()}</h3>
       <div className="episode-grid">
-        {episodes.map((episode) => <Link key={episode.id} to={`/watch/${movie.slug}/${episode.id}`} state={{ preview: movie }}><Play />{episode.name}</Link>)}
+        {/* pointerdown kéo trước chunk trang xem + hls.js: cú bấm vào một tập là
+            lúc chắc chắn nhất rằng trình phát sắp cần đến, mà nó vẫn đến trước
+            khi router đổi trang. */}
+        {episodes.map((episode) => <Link key={episode.id} to={`/watch/${movie.slug}/${episode.id}`} state={{ preview: movie }} onPointerDown={preloadPlayer}><Play />{episode.name}</Link>)}
       </div>
     </div>) : <EmptyState title="Chưa có nguồn phát" message="Bấm “Làm mới nguồn” để tải lại từ nguồn phim." />}
   </section>;
@@ -123,7 +127,7 @@ export default function Detail() {
           <p className="description">{clean(movie.description) || 'Chưa có mô tả.'}</p>
           <div className="actions">
             {first
-              ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`} state={{ preview: movie }}><Play fill="currentColor" />Xem ngay</Link>
+              ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`} state={{ preview: movie }} onPointerDown={preloadPlayer}><Play fill="currentColor" />Xem ngay</Link>
               : <button className="button primary" disabled><Play />{loading ? 'Đang tải nguồn phát' : 'Chưa có tập'}</button>}
             {/* Lưu phim cần id trong kho — bản mô tả từ thẻ phim chưa có id. */}
             {fetched ? <FavoriteButton movieId={fetched.id} /> : null}

@@ -1,16 +1,21 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
+import { loadDetail, loadWatch } from './chunks';
 import { RouteFallback, TopProgress } from './ui';
 
 /**
  * Mỗi trang là một chunk riêng: mở trang chủ không phải tải kèm trình phát,
  * và hls.js chỉ về máy khi người xem thật sự bấm vào một tập.
+ *
+ * Chi tiết và Xem lấy hàm nạp từ `chunks.ts` chứ không tự viết `import()`: hai
+ * chunk đó còn được hâm nóng từ lúc `pointerdown` ở chỗ khác, và cả hai nơi phải
+ * dùng chung một specifier mới ra chung một chunk.
  */
 const Home = lazy(() => import('./pages/Home'));
 const Browse = lazy(() => import('./pages/Browse'));
 const SearchPage = lazy(() => import('./pages/Search'));
-const Detail = lazy(() => import('./pages/Detail'));
-const Watch = lazy(() => import('./pages/Watch'));
+const Detail = lazy(loadDetail);
+const Watch = lazy(loadWatch);
 const Library = lazy(() => import('./pages/Library'));
 const Local = lazy(() => import('./pages/Local'));
 const People = lazy(() => import('./pages/People'));

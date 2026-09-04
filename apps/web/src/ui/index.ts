@@ -9,7 +9,7 @@
 export { clean, humanize, image, listLabels, stillMotion } from './format';
 export { useDebounced } from './hooks';
 export { Logo, Shell } from './Shell';
-export { MovieCard, RailLabel, Spec } from './cards';
+export { MovieCard, RailLabel, Spec, useWarmDetail } from './cards';
 export { MovieRow } from './Rail';
 export { EmptyState, ErrorState, RouteFallback, SkeletonGrid, SyncStatus } from './states';
 export { BackToTop, Breadcrumb, Pagination } from './nav';

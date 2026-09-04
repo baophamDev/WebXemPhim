@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { getEpisodes } from './db.js';
 import { httpError } from './errors.js';
 import { filterPlaylist, type AdFilterReport } from './hls.js';
+import { asyncRoute } from './http.js';
 
 const MAX_PLAYLIST_BYTES = 4 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 15_000;
@@ -35,8 +36,6 @@ const CACHE_LIMIT = 300;
 const secret = process.env.STREAM_SECRET ?? crypto.randomBytes(32).toString('hex');
 
 const idSchema = z.coerce.number().int().positive();
-const asyncRoute = (handler: (req: express.Request, res: express.Response) => Promise<unknown>) =>
-  (req: express.Request, res: express.Response, next: express.NextFunction) => handler(req, res).catch(next);
 
 export const streamRouter = express.Router();
 

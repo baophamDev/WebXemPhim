@@ -59,7 +59,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Bộ lọc quảng cáo m3u8 chạy trên playlist tự dựng, không cần mạng hay DB
+      # Không cần mạng hay DB: bộ lọc quảng cáo m3u8 chạy trên playlist tự dựng,
+      # còn test của apps/web chỉ đọc index.html + boot.ts để so URL.
       - name: Test
         run: npm test
 

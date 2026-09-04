@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Play, Star } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { usePrefetch } from '../api';
-import { rememberMovie } from '../preview';
+import { preloadDetail } from '../chunks';
+import { rememberMovie, type MoviePreview } from '../preview';
 import type { Movie } from '../types';
 import { image } from './format';
 
@@ -22,17 +23,28 @@ export function Spec({ movie }: { movie: Movie }) {
   </ul>;
 }
 
-export function MovieCard({ movie, rank }: { movie: Movie; rank?: number }) {
+/**
+ * Hâm nóng trang chi tiết của một phim, dùng ở `pointerdown` của link dẫn tới nó.
+ *
+ * Ba việc trong một cú: ghi lại bản mô tả để trang đích vẽ được nửa trên ngay,
+ * bắn trước request phim (API bắt đầu nhập ở nền), và kéo chunk của trang về.
+ *
+ * `pointerdown` là tín hiệu chắc chắn nhất mà vẫn đến **trước** lúc router đổi
+ * trang (navigation xảy ra ở `click`, tức là ở mouseup), nên cú bấm mua được vài
+ * trăm ms. Cố tình không làm khi mới trỏ chuột vào: kéo chuột ngang một dải phim
+ * là 20 thẻ, thành 20 job nhập ở nguồn ngoài cho phim không ai định xem.
+ *
+ * Là hook chứ không phải hàm thường vì `usePrefetch` là hook; trả về một hàm dựng
+ * handler để hero trang chủ và dải "Xem gì nữa" — hai link sang trang chi tiết
+ * không đi qua `MovieCard` — dùng được cùng một logic.
+ */
+export function useWarmDetail() {
   const prefetch = usePrefetch('getMovie');
-  /**
-   * `pointerdown` là tín hiệu chắc chắn nhất mà vẫn đến **trước** lúc router đổi
-   * trang (navigation xảy ra ở `click`, tức là ở mouseup). Nhờ vậy job nhập phim ở
-   * API đã bắt đầu trước khi trang chi tiết mở ra, và cú bấm mua được vài trăm ms.
-   *
-   * Cố tình không prefetch khi mới trỏ chuột vào: kéo chuột ngang một dải phim là
-   * 20 thẻ, thành 20 job nhập ở nguồn ngoài cho những phim không ai định xem.
-   */
-  const warm = () => { rememberMovie(movie); prefetch(movie.slug); };
+  return (movie: MoviePreview) => () => { rememberMovie(movie); prefetch(movie.slug); preloadDetail(); };
+}
+
+export function MovieCard({ movie, rank }: { movie: Movie; rank?: number }) {
+  const warm = useWarmDetail();
   // draggable=false: thẻ nằm trong dải kéo ngang được, mà mặc định trình duyệt
   // cho kéo cả link và ảnh — ảnh mờ bay theo con trỏ làm cú kéo trông như lỗi.
   return <Link
@@ -40,7 +52,7 @@ export function MovieCard({ movie, rank }: { movie: Movie; rank?: number }) {
     // Bản mô tả đi kèm cú điều hướng: trang chi tiết vẽ được poster/tên/năm ngay,
     // không phải đợi API. Xem `src/preview.ts`.
     state={{ preview: movie }}
-    onPointerDown={warm} onClick={() => rememberMovie(movie)}
+    onPointerDown={warm(movie)} onClick={() => rememberMovie(movie)}
   >
     {rank ? <span className="rank">{rank}</span> : null}
     <div className="poster">

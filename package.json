@@ -12,7 +12,7 @@
     "build": "npm run build --workspace services/api && npm run build --workspace apps/web",
     "start": "npm run start --workspace services/api",
     "typecheck": "npm run typecheck --workspace services/api && npm run typecheck --workspace apps/web",
-    "test": "npm run test --workspace services/api",
+    "test": "npm run test --workspace services/api && npm run test --workspace apps/web",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

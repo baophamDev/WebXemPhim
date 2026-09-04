@@ -24,8 +24,11 @@ apps/web/                 Frontend React/Vite
 apps/web/public/tv/       Lớp điều khiển TV (D-pad, phím remote LG)
 apps/web/src/source.ts    Nguồn phim đang chọn + nguồn đã trả lời
 apps/web/src/theme.ts     Chế độ sáng/tối/theo máy
+apps/web/src/boot.ts      Nhặt lại request mà index.html đã bắn trước
+apps/web/src/chunks.ts    Chunk nạp lười + hâm nóng trước khi bấm
 services/api/             Backend Express
 services/api/src/db.ts    Kết nối PostgreSQL
+services/api/src/http.ts  Vỏ bọc route: bắt lỗi async, Cache-Control cho route chỉ đọc
 services/api/src/hls.ts   Bộ lọc quảng cáo trong playlist m3u8
 services/api/src/stream.ts Proxy playlist đã bóc quảng cáo cho player
 services/api/src/importer.ts Hàng đợi nhập phim chạy ở nền
@@ -44,6 +47,8 @@ Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn vi�
 App cho TV LG là **hosted web app**: file `.ipk` chỉ chứa `appinfo.json` + icon, còn nội dung lấy thẳng từ domain Vercel. Nghĩa là sửa web chỉ cần `git push`, không đóng gói lại. Hướng dẫn đầy đủ ở [docs/webos.md](docs/webos.md).
 
 Playlist của nguồn có quảng cáo chèn sẵn; API dựng lại playlist đã bóc quảng cáo trước khi giao cho player, chi tiết ở [docs/ads.md](docs/ads.md).
+
+Trang chủ và trang xem **không chờ bundle JS rồi mới hỏi API**: `index.html` bắn trước request của đúng route đang mở ngay lúc trình duyệt còn đọc HTML, còn chunk trang chi tiết/trang xem được kéo về từ `pointerdown`. Cách làm và những chỗ dễ làm nó im lặng vô hiệu ở [docs/prefetch.md](docs/prefetch.md).
 
 ## 2. Những thứ cần chuẩn bị
 
@@ -404,7 +409,7 @@ npm run lint
 npm run build
 ```
 
-`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8, của tầng nguồn catalog (resolver, TMDB, TheTVDB) và của hàng đợi nhập phim — tất cả trên dữ liệu tự dựng, không cần mạng, khoá API hay database. Adapter nào cần khoá thì test tự đặt khoá giả và thay `globalThis.fetch`, nên CI không có bí mật nào vẫn chạy đủ.
+`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8, của tầng nguồn catalog (resolver, TMDB, TheTVDB), của hàng đợi nhập phim, của header cache (`services/api/test/http.test.js`) và của phép khớp URL bắn trước (`apps/web/test/boot.test.mjs`) — tất cả trên dữ liệu tự dựng, không cần mạng, khoá API hay database. Adapter nào cần khoá thì test tự đặt khoá giả và thay `globalThis.fetch`, nên CI không có bí mật nào vẫn chạy đủ.
 
 `npm run lint` dùng ESLint 9 với cấu hình ở [eslint.config.mjs](eslint.config.mjs) — một file cho cả hai workspace. Cảnh báo (`warn`) không làm lệnh thất bại, chỉ lỗi (`error`) mới. `npm run lint:fix` sửa những gì sửa được tự động.
 

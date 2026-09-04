@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
+import { bootUrl, claimBoot } from './boot';
 import { noteAnswer, sourceParam } from './source';
 import type { CatalogQuery, Episode, ImportJob, InactiveSource, Movie, MovieList, Navigation, Person, PersonList, SourceHealth, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
@@ -54,6 +55,35 @@ function catalogUrl(kind:CatalogQuery['kind'],value?:string){
 }
 
 const rawBaseQuery=fetchBaseQuery({baseUrl:apiBaseUrl});
+type QueryResult=Awaited<ReturnType<typeof rawBaseQuery>>;
+
+/**
+ * Trả lời bằng request đã bắn trước từ `index.html`, nếu có một cái khớp.
+ *
+ * Nhờ nó mà trang chủ và trang xem không phải chờ trọn một round-trip *sau khi*
+ * bundle về: câu hỏi đã đi từ lúc trình duyệt đọc HTML. `null` nghĩa là không có
+ * gì dùng được — mọi nhánh lỗi đều trả `null` để đường thường chạy nguyên vẹn.
+ *
+ * URL do `bootUrl()` dựng, không dựng lại ở đây: nó là *một nửa* của phép so khớp
+ * với chuỗi mà index.html nối bằng tay, nên phải nằm cạnh `claimBoot` để test đo
+ * được cả hai nửa cùng lúc.
+ */
+async function fromBoot(args:string|FetchArgs):Promise<QueryResult|null>{
+  if(typeof args!=='string'&&args.method&&args.method!=='GET')return null;
+  const reply=claimBoot(bootUrl(apiBaseUrl,args));
+  if(!reply)return null;
+  try{
+    const raw=await reply;
+    // Đúng hình dạng của fetchBaseQuery với responseHandler mặc định: mọi 2xx
+    // (kể cả 202 "đang nhập phim") vào `data`, còn lại vào `error` kèm body.
+    const data=raw.text?JSON.parse(raw.text):null;
+    return raw.ok?{data}:{error:{status:raw.status,data}};
+  }catch{
+    // Mạng chết, hoặc body không phải JSON (rewrite trả về index.html chẳng
+    // hạn): để đường thường sinh ra đúng cái lỗi mà app vẫn quen giải thích.
+    return null;
+  }
+}
 
 /**
  * Câu trả lời cho "cho tôi phim này". `movie:null` + `importing` nghĩa là API đang
@@ -81,6 +111,9 @@ const NEEDS_SOURCE=/^\/(catalog|provider|import)\b/;
  * Đây cũng là chỗ ghi lại nguồn **thật sự** trả lời (`noteAnswer`): mọi response
  * catalog đều mang theo `source` của resolver, nên bắt ở một chỗ rẻ hơn nhiều so
  * với việc luồn nó qua props của từng trang.
+ *
+ * Và là chỗ nhặt lại request đã bắn trước từ `index.html` (`fromBoot`) — phải nằm
+ * sau đoạn gắn `?source=` ở trên, vì URL đem đi so khớp là URL cuối cùng.
  */
 const baseQuery:BaseQueryFn<string|FetchArgs,unknown,FetchBaseQueryError>=async(args,api,extra)=>{
   const url=typeof args==='string'?args:args.url;
@@ -92,7 +125,7 @@ const baseQuery:BaseQueryFn<string|FetchArgs,unknown,FetchBaseQueryError>=async(
     next.params={...(next.params as Record<string,unknown>|undefined),source};
     request=next;
   }
-  const result=await rawBaseQuery(request,api,extra);
+  const result=(await fromBoot(request))??(await rawBaseQuery(request,api,extra));
   // Ghi lại cả khi đang `auto` — nhất là khi đang `auto`, vì lúc đó lựa chọn của
   // người dùng không nói được gì về nguồn nào đã trả lời.
   if(external)noteAnswer(result.data);
