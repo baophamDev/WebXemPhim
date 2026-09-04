@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
-import { clean, ErrorState, image, MovieRow, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus } from '../ui';
+import { clean, BackToTop, ErrorState, image, MovieRow, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus } from '../ui';
 import type { Movie } from '../types';
 
 /**
@@ -93,5 +93,6 @@ export default function Home() {
       <MovieRow label="Phim lẻ" title="Xem một buổi" items={movies.data?.items ?? []} to="/browse/list/phim-le" />
       <MovieRow label="Chất lượng" title="Bản 4K" items={ultra.data?.items ?? []} to="/browse/list/4k" />
     </div>
+    <BackToTop />
   </Shell>;
 }
