@@ -26,7 +26,7 @@ services/api/             Backend Express
 services/api/src/db.ts    Kết nối PostgreSQL
 services/api/src/hls.ts   Bộ lọc quảng cáo trong playlist m3u8
 services/api/src/stream.ts Proxy playlist đã bóc quảng cáo cho player
-services/api/src/providers/ Lớp thay thế nguồn catalog
+services/api/src/providers/ Tầng nguồn catalog (nhiều nguồn, có fallback)
 supabase/migrations/      Schema PostgreSQL
 BaoNhanCinema/            App TV LG (webOS) — nội dung file .ipk
 build-ipk.cmd             Đóng gói/cài .ipk lên TV LG
@@ -34,7 +34,7 @@ railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
 
-Nguồn catalog mặc định là VSMOV. Database dùng hai trường `provider` và `provider_id`, vì vậy có thể thêm nguồn khác mà không cần đổi schema.
+Nguồn catalog là **một tầng nhiều nguồn có thứ tự ưu tiên** (`CATALOG_SOURCES`), không phải một nguồn duy nhất: nguồn đầu lỗi thì tự rơi xuống nguồn sau, và nguồn `metadata` (TMDB) bồi vào chỗ trống của nguồn `playable` (VSMOV). Chi tiết ở mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
 
 App cho TV LG là **hosted web app**: file `.ipk` chỉ chứa `appinfo.json` + icon, còn nội dung lấy thẳng từ domain Vercel. Nghĩa là sửa web chỉ cần `git push`, không đóng gói lại. Hướng dẫn đầy đủ ở [docs/webos.md](docs/webos.md).
 
@@ -140,8 +140,10 @@ Trong Railway service, mở **Variables** và thêm từng biến:
 DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
-CATALOG_PROVIDER=vsmov
+CATALOG_SOURCES=vsmov,tmdb
 VSMOV_API_URL=https://vsmov.com/api
+TMDB_ACCESS_TOKEN=token-v4-cua-themoviedb
+TMDB_LANGUAGE=vi-VN
 WEB_ORIGIN=http://localhost:5173
 HOST=0.0.0.0
 ```
@@ -153,11 +155,15 @@ Giải thích:
 | `DATABASE_URL` | Kết nối PostgreSQL Supabase |
 | `DATABASE_SSL` | Bật SSL khi kết nối Supabase |
 | `DATABASE_POOL_SIZE` | Số connection tối đa của một API instance |
-| `CATALOG_PROVIDER` | Provider catalog đang sử dụng |
-| `VSMOV_API_URL` | Base URL của provider VSMOV |
+| `CATALOG_SOURCES` | Danh sách nguồn catalog, **thứ tự là ưu tiên** (`vsmov,tmdb`) |
+| `VSMOV_API_URL` | Base URL của nguồn VSMOV |
+| `TMDB_ACCESS_TOKEN` | Token v4 của TMDB. Không có thì dùng `TMDB_API_KEY` (khoá v3); không có cả hai thì nguồn tmdb tự tắt |
+| `TMDB_LANGUAGE` | Ngôn ngữ metadata TMDB, mặc định `vi-VN` |
 | `WEB_ORIGIN` | Những frontend domain được phép gọi API bằng trình duyệt |
 | `HOST` | Cho phép Railway truy cập Express server |
 | `STREAM_SECRET` | Tuỳ chọn: khoá ký link playlist con của bộ lọc quảng cáo ([docs/ads.md](docs/ads.md)) |
+
+`CATALOG_PROVIDER` của bản cũ vẫn được đọc nếu chưa có `CATALOG_SOURCES`, nhưng nên đổi sang tên mới.
 
 Không tự tạo biến `PORT`. Railway tự cung cấp `PORT` cho ứng dụng.
 
@@ -197,10 +203,12 @@ Kết quả đúng có dạng:
 {
   "ok": true,
   "service": "bao-nhan-cinema-api",
-  "provider": "vsmov",
+  "sources": ["vsmov", "tmdb"],
   "time": "2026-08-17T00:00:00.000Z"
 }
 ```
+
+Muốn biết nguồn nào đang sống, nguồn nào đang bị tạm ngừng thì gọi `/api/providers`.
 
 Nếu health check không hoạt động, chưa nên deploy Vercel. Xem phần xử lý lỗi ở cuối README.
 
@@ -338,9 +346,11 @@ HOST=0.0.0.0
 WEB_ORIGIN=http://localhost:5173
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=5
-CATALOG_PROVIDER=vsmov
+CATALOG_SOURCES=vsmov,tmdb
 VSMOV_API_URL=https://vsmov.com/api
 ```
+
+Chạy local không có khoá TMDB vẫn được: nguồn tmdb tự tắt kèm một dòng cảnh báo ở console, phần còn lại của web chạy bình thường.
 
 `VITE_API_URL` không bắt buộc khi chạy local vì Vite proxy `/api` sang `http://localhost:4000`.
 
@@ -378,11 +388,16 @@ Chạy tại thư mục gốc:
 
 ```powershell
 npm run typecheck
-npm run build
 npm test
+npm run lint
+npm run build
 ```
 
-Cả ba lệnh phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8 trên playlist tự dựng, không cần mạng hay database.
+`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8 và của tầng nguồn catalog trên dữ liệu tự dựng, không cần mạng hay database.
+
+`npm run lint` dùng ESLint 9 với cấu hình ở [eslint.config.mjs](eslint.config.mjs) — một file cho cả hai workspace. Cảnh báo (`warn`) không làm lệnh thất bại, chỉ lỗi (`error`) mới. `npm run lint:fix` sửa những gì sửa được tự động.
+
+Lint là dependency mới, nên lần đầu phải chạy `npm install` ở thư mục gốc một lần để cập nhật `package-lock.json`; nếu push trước khi làm việc đó, bước `npm ci` trên CI sẽ fail vì lock không khớp `package.json`.
 
 ## 10. Dữ liệu và bảo mật
 
@@ -396,36 +411,90 @@ Cả ba lệnh phải kết thúc với exit code `0`. `npm test` chạy bộ te
 - Dự án hiện chưa có đăng nhập người dùng. Xóa dữ liệu trình duyệt sẽ tạo `deviceId` mới.
 - CORS chỉ kiểm soát trình duyệt, không phải cơ chế xác thực API. Endpoint đồng bộ hiện vẫn là endpoint công khai nếu ai đó biết URL Railway.
 
-## 11. Thay catalog provider
+## 11. Tầng nguồn catalog
 
-Provider mới phải triển khai interface tại:
-
-```text
-services/api/src/providers/types.ts
-```
-
-Sau đó đăng ký provider trong:
+Tất cả nguồn nằm ở `services/api/src/providers/`:
 
 ```text
-services/api/src/providers/index.ts
+types.ts      Hợp đồng CatalogSource + các kiểu dữ liệu chuẩn
+normalize.ts  Chuẩn hoá + kiểm tra shape ở biên, khớp phim giữa hai nguồn
+http.ts       fetch dùng chung: timeout, cache theo TTL
+resolver.ts   Chọn nguồn, fallback, circuit breaker, bồi metadata
+vsmov.ts      Nguồn playable (có link tập)
+tmdb.ts       Nguồn metadata (không có link tập)
+index.ts      Đăng ký nguồn, đọc CATALOG_SOURCES
 ```
 
-Ví dụ:
+Hai loại nguồn khác nhau ở chỗ được phép trả gì:
+
+| Loại | Ví dụ | Được dùng cho |
+| --- | --- | --- |
+| `playable` | vsmov | Danh sách, tìm kiếm, **và link tập** |
+| `metadata` | tmdb | Chỉ lấp chỗ trống: poster, mô tả, năm, điểm, diễn viên |
+
+Mọi method trong `CatalogSource` đều **optional**. Resolver hỏi `typeof source.byGenre === 'function'` trước khi gọi, nên một nguồn chỉ có `search` vẫn đăng ký được — nó chỉ đơn giản là bị bỏ qua ở những khả năng nó không có.
+
+### 11.1. Cách resolver chọn nguồn
+
+1. Lọc ra các nguồn có khả năng đang cần, theo đúng thứ tự `CATALOG_SOURCES`.
+2. Nguồn nào đang bị circuit breaker mở thì bị đẩy xuống cuối, không bị loại — hết nguồn thì vẫn thử nó.
+3. Gọi lần lượt. Kết quả phải qua `zod` mới được nhận; sai shape bị tính là lỗi của nguồn đó.
+4. Nguồn lỗi 3 lần liên tiếp thì bị tạm ngừng 30 giây, nhân đôi mỗi lần lỗi tiếp, tối đa 10 phút. Không có bước này thì mỗi request phải đợi hết 20 giây timeout của nguồn chết trước khi sang nguồn sau.
+5. Hết mọi nguồn mới trả lỗi, và thông điệp lỗi kể tên từng nguồn cùng lý do.
+
+Riêng `detail()` đi xa hơn: ưu tiên nguồn playable **có tập**, rồi bồi các field còn `null` từ những nguồn còn lại và dừng ngay khi đã đủ. Nguồn metadata không bao giờ ghi đè field mà nguồn playable đã có — phim nào nguồn nào phát thì nguồn đó là sự thật về tên, tập, chất lượng.
+
+Hai nguồn đặt slug khác nhau cho cùng một phim, nên khi slug không khớp, resolver tìm lại bằng tên + năm (`matchScore`, ngưỡng `0.72`) và ghi nhớ cặp slug đó. Dưới ngưỡng thì coi như không tìm thấy — thà thiếu metadata còn hơn gán poster của phim khác.
+
+### 11.2. Thêm một nguồn
+
+Viết adapter export một object `CatalogSource`, dùng `getJson` của `http.ts` và các helper của `normalize.ts` để trả đúng shape:
 
 ```ts
-const providers = {
-  vsmov,
-  myProvider
+export const mySource: CatalogSource = {
+  name: 'mysource',
+  kind: 'playable',
+  async search(keyword, page = 1, limit = 24) { /* ... */ },
+  async detail(slug) { /* ... */ }
 };
 ```
 
-Trên Railway, đổi:
+Đăng ký trong `providers/index.ts`:
 
-```env
-CATALOG_PROVIDER=myprovider
+```ts
+const AVAILABLE = {
+  vsmov: { source: vsmov, enabled: true, hint: '' },
+  tmdb: { source: tmdb, enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' },
+  mysource: { source: mySource, enabled: Boolean(process.env.MYSOURCE_API_URL), hint: 'thiếu MYSOURCE_API_URL' }
+};
 ```
 
-Database không phụ thuộc tên VSMOV vì phim được xác định bằng `provider` và `provider_id`.
+Rồi đổi biến môi trường trên Railway:
+
+```env
+CATALOG_SOURCES=mysource,vsmov,tmdb
+```
+
+Tên nguồn không có trong `AVAILABLE` sẽ làm API dừng ngay lúc khởi động — sai chính tả biến môi trường phải vỡ ồn ào, không im lặng chạy thiếu nguồn.
+
+Database không phụ thuộc tên nguồn vì phim được xác định bằng `provider` và `provider_id`.
+
+### 11.3. Xem nguồn nào đang sống
+
+```text
+GET /api/providers
+```
+
+```json
+{
+  "sources": [
+    { "name": "vsmov", "kind": "playable", "healthy": true, "failures": 0, "openUntil": null, "lastError": null },
+    { "name": "tmdb", "kind": "metadata", "healthy": false, "failures": 3, "openUntil": "2026-09-04T10:31:00.000Z", "lastError": "Nguồn tmdb trả HTTP 401 (kiểm tra khoá API trong biến môi trường)" }
+  ]
+}
+```
+
+`healthy: false` nghĩa là đang bị tạm ngừng, không phải nguồn đã chết hẳn; `openUntil` là lúc nó được thử lại.
 
 ## 12. Xử lý lỗi thường gặp
 

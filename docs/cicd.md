@@ -6,11 +6,16 @@ Pipeline nằm ở `.github/workflows/ci.yml`, chạy trên GitHub Actions.
 
 | Sự kiện | Chạy gì |
 |---|---|
-| PR vào `main` | `build` (typecheck + build) |
-| Push vào `main` | `build`, rồi `deploy-api` + `deploy-web` song song |
+| PR vào `main` | `lint` + `build` (typecheck + test + build) |
+| Push vào `main` | `lint` + `build`, rồi `deploy-api` + `deploy-web` song song |
 
-Job `build` chạy `npm ci` → `npm run typecheck` → `npm run build` trên Node 22, và
-upload `apps/web/dist` làm artifact (giữ 7 ngày) để đối chiếu khi cần.
+Job `build` chạy `npm ci` → `npm run typecheck` → `npm test` → `npm run build` trên Node 22,
+và upload `apps/web/dist` làm artifact (giữ 7 ngày) để đối chiếu khi cần.
+
+Job `lint` chạy `npm run lint` (ESLint 9, cấu hình `eslint.config.mjs`) song song với
+`build` và **không** chặn deploy: cấu hình ESLint được viết offline nên lần chạy thật đầu
+tiên chính là ở đây. Khi job đã xanh một lần, đổi `needs: build` của hai job deploy thành
+`needs: [build, lint]` để lint thành cổng chặn thật sự.
 
 Hai job deploy chỉ chạy khi push vào `main` và `build` đã pass. Cả hai dùng
 GitHub Environment `production`, nên có thể bật required reviewers trong
@@ -51,10 +56,16 @@ và chỉ dùng CI làm cổng chặn lỗi.
 ```bash
 npm ci
 npm run typecheck
+npm test
+npm run lint
 npm run build
 ```
 
-Đây đúng là các bước job `build` thực hiện.
+Đây đúng là các bước hai job `lint` và `build` thực hiện.
+
+Lần đầu sau khi thêm lint: chạy `npm install` (không phải `npm ci`) để `package-lock.json`
+nhận các devDependency mới của ESLint. Push mà quên bước này thì `npm ci` trên CI fail
+ngay ở bước cài dependency của **cả hai** job.
 
 ## Việc còn lại sau lần chạy đầu
 

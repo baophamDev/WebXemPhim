@@ -1,10 +1,62 @@
-import { vsmov } from '../vsmov.js';
-import type { CatalogProvider } from './types.js';
+/**
+ * Nơi quyết định nguồn nào được bật và theo thứ tự nào.
+ *
+ * Cấu hình bằng `CATALOG_SOURCES`, danh sách tên cách nhau bằng dấu phẩy, **thứ
+ * tự là ưu tiên**:
+ *
+ *   CATALOG_SOURCES=vsmov,tmdb    nguồn phát trước, TMDB bồi metadata
+ *   CATALOG_SOURCES=tmdb          chỉ catalog metadata, không phát
+ *
+ * `CATALOG_PROVIDER` (số ít) của bản cũ vẫn đọc được để lần deploy tới không cần
+ * đổi biến môi trường trước — coi như danh sách một phần tử.
+ *
+ * Nguồn thiếu cấu hình thì **im lặng bỏ qua** chứ không làm sập tiến trình: TMDB
+ * không có khoá API là chuyện bình thường ở máy dev, và không có lý do gì để cả
+ * API không khởi động được vì thiếu một nguồn bồi metadata. Nhưng bật đúng tên mà
+ * nguồn không tồn tại thì vẫn ném — đó là lỗi chính tả trong cấu hình, im lặng
+ * chỉ khiến người ta đi tìm ở chỗ khác.
+ */
+import { CatalogResolver } from './resolver.js';
+import { tmdb, tmdbEnabled } from './tmdb.js';
+import type { CatalogSource } from './types.js';
+import { vsmov } from './vsmov.js';
 
-const providers: Record<string, CatalogProvider> = { vsmov };
-const providerName = (process.env.CATALOG_PROVIDER ?? 'vsmov').toLowerCase();
+const AVAILABLE: Record<string, { source: CatalogSource; enabled: boolean; hint: string }> = {
+  vsmov: { source: vsmov, enabled: true, hint: '' },
+  tmdb: { source: tmdb, enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' }
+};
 
-export const catalogProvider = providers[providerName];
-if (!catalogProvider) throw new Error(`Unsupported CATALOG_PROVIDER: ${providerName}`);
+const DEFAULT_ORDER = 'vsmov,tmdb';
 
-export type { CatalogFilters, CatalogProvider } from './types.js';
+function requested(): string[] {
+  const raw = process.env.CATALOG_SOURCES ?? process.env.CATALOG_PROVIDER ?? DEFAULT_ORDER;
+  const names = raw.split(',').map((name) => name.trim().toLowerCase()).filter(Boolean);
+  return [...new Set(names)];
+}
+
+function build(): CatalogSource[] {
+  const enabled: CatalogSource[] = [];
+  for (const name of requested()) {
+    const entry = AVAILABLE[name];
+    if (!entry) throw new Error(`Nguồn catalog không tồn tại: "${name}" (có: ${Object.keys(AVAILABLE).join(', ')})`);
+    if (!entry.enabled) {
+      console.warn(`[catalog] bỏ qua nguồn ${name}: ${entry.hint}`);
+      continue;
+    }
+    enabled.push(entry.source);
+  }
+  if (!enabled.length) {
+    // Không còn nguồn nào bật được: vẫn cắm vsmov vào để API mở cổng và các đường
+    // có fallback về DB (menu điều hướng, /api/movies) tiếp tục phục vụ được.
+    console.warn('[catalog] không nguồn nào được bật, quay về vsmov');
+    return [vsmov];
+  }
+  return enabled;
+}
+
+export const catalog = new CatalogResolver(build());
+
+console.log(`[catalog] nguồn đang bật (theo ưu tiên): ${catalog.names.join(' → ')}`);
+
+export type { CatalogFilters, CatalogSource, ListPage, MovieSummary, SourceDetail, SourceHealth, Taxonomy } from './types.js';
+export type { ResolvedDetail } from './resolver.js';

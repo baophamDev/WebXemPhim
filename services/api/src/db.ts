@@ -225,9 +225,9 @@ export async function upsertMovie(input: any): Promise<number> {
         trailer_url=EXCLUDED.trailer_url,rating=EXCLUDED.rating,view_count=EXCLUDED.view_count,tmdb_id=EXCLUDED.tmdb_id,
         imdb_id=EXCLUDED.imdb_id,raw_json=EXCLUDED.raw_json,search_text=EXCLUDED.search_text,updated_at=NOW() RETURNING id`;
     const movieId = rows[0].id as number;
-    await replaceNames(tx, 'movie_genres', movieId, list(movie.category));
-    await replaceNames(tx, 'movie_countries', movieId, list(movie.country));
-    await replaceCast(tx, movieId, list(movie.actor), list(movie.director));
+    await replaceNames(tx, 'movie_genres', movieId, list(movie.category ?? movie.genres));
+    await replaceNames(tx, 'movie_countries', movieId, list(movie.country ?? movie.countries));
+    await replaceCast(tx, movieId, list(movie.actor ?? movie.actors), list(movie.director ?? movie.directors));
     return movieId;
   });
 }

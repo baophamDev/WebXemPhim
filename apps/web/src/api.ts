@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { CatalogQuery, Episode, Movie, MovieList, Navigation, Person, PersonList, SyncState, TaxonomyList, UnifiedSearch } from './types';
+import type { CatalogQuery, Episode, Movie, MovieList, Navigation, Person, PersonList, SourceHealth, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
 /**
  * crypto.randomUUID chỉ có trong secure context. Mở web qua IP LAN
@@ -58,7 +58,8 @@ export const cinemaApi=createApi({
   endpoints:(builder)=>({
     getCatalog:builder.query<MovieList,CatalogQuery>({query:({kind,value,...params})=>({url:catalogUrl(kind,value),params})}),
     searchCatalog:builder.query<MovieList,{q:string;page?:number;limit?:number;type?:string;status?:string;year?:string}>({query:({q,...params})=>({url:'/catalog/search',params:{q,...params}})}),
-    searchVsmov:builder.query<MovieList,{q:string;page?:number;limit?:number}>({query:({q,...params})=>({url:'/vsmov/search',params:{q,...params}})}),
+    // Trạng thái từng nguồn catalog: nguồn nào đang bị tạm ngừng, lỗi cuối là gì.
+    getProviders:builder.query<{sources:SourceHealth[]},void>({query:()=>'/providers'}),
     getTaxonomy:builder.query<TaxonomyList,'genres'|'countries'|'years'|'actors'|'codes'>({query:(kind)=>`/catalog/${kind}`}),
     // Menu điều hướng đổi rất chậm — giữ cache 10 phút để không gọi lại mỗi lần đổi route.
     getNavigation:builder.query<Navigation,void>({query:()=>'/catalog/navigation',keepUnusedDataFor:600}),
@@ -82,4 +83,4 @@ export const cinemaApi=createApi({
   })
 });
 
-export const {useGetCatalogQuery,useSearchCatalogQuery,useSearchVsmovQuery,useGetTaxonomyQuery,useGetNavigationQuery,useSearchAllQuery,useGetPeopleQuery,useGetPersonQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;
+export const {useGetCatalogQuery,useSearchCatalogQuery,useGetProvidersQuery,useGetTaxonomyQuery,useGetNavigationQuery,useSearchAllQuery,useGetPeopleQuery,useGetPersonQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;

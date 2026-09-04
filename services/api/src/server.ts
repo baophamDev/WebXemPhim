@@ -9,7 +9,7 @@ import {
   saveProgress, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
 } from './db.js';
 import { describeFailure, shortCause } from './errors.js';
-import { catalogProvider, type CatalogFilters } from './providers/index.js';
+import { catalog, type CatalogFilters } from './providers/index.js';
 import { streamRouter } from './stream.js';
 import { slugifyName } from './text.js';
 import { syncLatest } from './sync.js';
@@ -58,8 +58,13 @@ const slugSchema = z.string().trim().min(1).max(160).regex(/^[a-zA-Z0-9._-]+$/);
 const idSchema = z.coerce.number().int().positive();
 const queryFilters = (query: express.Request['query']) => filtersSchema.parse(query) as CatalogFilters;
 
+/**
+ * Nhập một phim từ các nguồn vào DB. Resolver ghép nguồn phát với nguồn metadata
+ * (xem `providers/resolver.ts`), nên bản ghi lưu xuống đã đầy đủ nhất có thể ở
+ * thời điểm nhập, không phải chờ lần sửa tay nào.
+ */
 async function importDetail(slug: string) {
-  const detail = await catalogProvider.detail(slug);
+  const detail = await catalog.detail(slug);
   const movieId = await upsertMovie(detail.movie);
   await upsertEpisodes(movieId, detail.episodes);
   return getMovie(slug, true);
@@ -75,17 +80,17 @@ async function refreshPeopleThumbs() {
   if (Date.now() - thumbsSyncedAt < 3_600_000) return;
   thumbsSyncedAt = Date.now();
   try {
-    const remote = await catalogProvider.actors();
-    const updated = await updatePeopleThumbs(remote.items.map((item: any) => ({ name: item.name, thumbUrl: item.thumbUrl })));
+    const remote = await catalog.actors();
+    const updated = await updatePeopleThumbs(remote.items.map((item) => ({ name: item.name, thumbUrl: item.thumbUrl })));
     if (updated) console.log(`Đã cập nhật ảnh cho ${updated} diễn viên`);
   } catch (error) {
-    console.warn('Không lấy được ảnh diễn viên từ provider:', (error as Error).message);
+    console.warn('Không lấy được ảnh diễn viên từ nguồn nào:', (error as Error).message);
   }
 }
 
 /**
- * Taxonomy ưu tiên provider (có slug chuẩn để gọi tiếp), provider chết thì dựng
- * từ DB để menu điều hướng không bao giờ trắng.
+ * Taxonomy ưu tiên nguồn ngoài (có slug chuẩn để gọi tiếp), mọi nguồn chết thì
+ * dựng từ DB để menu điều hướng không bao giờ trắng.
  */
 async function taxonomyWithFallback(
   fromProvider: () => Promise<{ items: unknown[] }>,
@@ -95,7 +100,7 @@ async function taxonomyWithFallback(
     const remote = await fromProvider();
     if (remote.items.length) return { source: 'provider', items: remote.items };
   } catch (error) {
-    console.warn('Taxonomy provider lỗi, chuyển sang DB:', (error as Error).message);
+    console.warn('Taxonomy không có nguồn nào trả lời, chuyển sang DB:', (error as Error).message);
   }
   const rows = await fromDb();
   return {
@@ -114,30 +119,38 @@ async function taxonomyWithFallback(
  */
 export const dbState = { ready: false, reason: null as string | null };
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-cinema-api', provider: catalogProvider.name, database: dbState.ready ? 'ready' : 'connecting', databaseError: dbState.reason, time: new Date().toISOString() }));
-app.get('/api/catalog/home', asyncRoute(async (req, res) => res.json(await catalogProvider.home(queryFilters(req.query)))));
-app.get('/api/catalog/lists/:slug', asyncRoute(async (req, res) => res.json(await catalogProvider.list(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
-app.get('/api/catalog/search', asyncRoute(async (req, res) => res.json(await catalogProvider.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query)))));
-app.get('/api/catalog/genres', asyncRoute(async (_req, res) => res.json(await taxonomyWithFallback(() => catalogProvider.genres(), listGenresFromDb))));
-app.get('/api/catalog/genres/:slug', asyncRoute(async (req, res) => res.json(await catalogProvider.byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
-app.get('/api/catalog/countries', asyncRoute(async (_req, res) => res.json(await taxonomyWithFallback(() => catalogProvider.countries(), listCountriesFromDb))));
-app.get('/api/catalog/countries/:slug', asyncRoute(async (req, res) => res.json(await catalogProvider.byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
-app.get('/api/catalog/years', asyncRoute(async (_req, res) => res.json(await taxonomyWithFallback(() => catalogProvider.years(), listYearsFromDb))));
-app.get('/api/catalog/years/:year', asyncRoute(async (req, res) => res.json(await catalogProvider.byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query)))));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-cinema-api', sources: catalog.names, database: dbState.ready ? 'ready' : 'connecting', databaseError: dbState.reason, time: new Date().toISOString() }));
+
+/**
+ * Trạng thái từng nguồn: nguồn nào đang bị circuit breaker tạm ngừng, lỗi cuối là
+ * gì, làm được những gì. Khi web thiếu poster hay danh sách trống, đây là chỗ đầu
+ * tiên cần xem — trước khi đi đọc log.
+ */
+app.get('/api/providers', (_req, res) => res.json({ sources: catalog.status() }));
+
+app.get('/api/catalog/home', asyncRoute(async (req, res) => res.json(await catalog.home(queryFilters(req.query)))));
+app.get('/api/catalog/lists/:slug', asyncRoute(async (req, res) => res.json(await catalog.listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
+app.get('/api/catalog/search', asyncRoute(async (req, res) => res.json(await catalog.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query)))));
+app.get('/api/catalog/genres', asyncRoute(async (_req, res) => res.json(await taxonomyWithFallback(() => catalog.genres(), listGenresFromDb))));
+app.get('/api/catalog/genres/:slug', asyncRoute(async (req, res) => res.json(await catalog.byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
+app.get('/api/catalog/countries', asyncRoute(async (_req, res) => res.json(await taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb))));
+app.get('/api/catalog/countries/:slug', asyncRoute(async (req, res) => res.json(await catalog.byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
+app.get('/api/catalog/years', asyncRoute(async (_req, res) => res.json(await taxonomyWithFallback(() => catalog.years(), listYearsFromDb))));
+app.get('/api/catalog/years/:year', asyncRoute(async (req, res) => res.json(await catalog.byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query)))));
 
 // Một request cho toàn bộ menu điều hướng, thay vì 3 request song song lúc mở trang.
 app.get('/api/catalog/navigation', asyncRoute(async (_req, res) => {
   const [genres, countries, years] = await Promise.all([
-    taxonomyWithFallback(() => catalogProvider.genres(), listGenresFromDb),
-    taxonomyWithFallback(() => catalogProvider.countries(), listCountriesFromDb),
-    taxonomyWithFallback(() => catalogProvider.years(), listYearsFromDb)
+    taxonomyWithFallback(() => catalog.genres(), listGenresFromDb),
+    taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb),
+    taxonomyWithFallback(() => catalog.years(), listYearsFromDb)
   ]);
   res.header('Cache-Control', 'public, max-age=600');
   res.json({ genres: genres.items, countries: countries.items, years: years.items });
 }));
 
-app.get('/api/catalog/codes', asyncRoute(async (_req, res) => res.json(await catalogProvider.codes())));
-app.get('/api/catalog/codes/:code', asyncRoute(async (req, res) => res.json(await catalogProvider.byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query)))));
+app.get('/api/catalog/codes', asyncRoute(async (_req, res) => res.json(await catalog.codes())));
+app.get('/api/catalog/codes/:code', asyncRoute(async (req, res) => res.json(await catalog.byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query)))));
 app.get('/api/catalog/movies/:slug', asyncRoute(async (req, res) => { const slug = slugSchema.parse(req.params.slug); res.json({ movie: await getMovie(slug, true) ?? await importDetail(slug) }); }));
 
 const moviesQuerySchema = z.object({
@@ -232,8 +245,9 @@ app.post('/api/sync/start', asyncRoute(async (req, res) => {
   void syncLatest(pages.pages).catch((error) => console.error('Catalog sync failed:', error)); res.status(202).json({ started: true });
 }));
 app.post('/api/import/:slug', asyncRoute(async (req, res) => res.json({ movie: await importDetail(slugSchema.parse(req.params.slug)) })));
-app.get('/api/provider/search', asyncRoute(async (req, res) => res.json(await catalogProvider.search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
-app.get('/api/vsmov/search', asyncRoute(async (req, res) => res.json(await catalogProvider.search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
+// Tìm trực tiếp ở nguồn ngoài, bỏ qua kho đã lưu. Alias `/api/vsmov/search` của
+// bản một-nguồn đã bỏ: tên nguồn không còn nằm trong đường dẫn nữa.
+app.get('/api/provider/search', asyncRoute(async (req, res) => res.json(await catalog.search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
 
 // Playlist HLS đã bóc quảng cáo của nguồn — xem docs/ads.md.
 app.use('/api/stream', streamRouter);

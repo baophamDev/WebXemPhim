@@ -13,5 +13,11 @@ export interface Navigation { genres:TaxonomyItem[]; countries:TaxonomyItem[]; y
 /** Kết quả tìm kiếm hợp nhất: phim trùng tên + người trùng tên. */
 export interface UnifiedSearch { query:string; movies:MovieList; people:Person[] }
 export interface SyncState { status:'idle'|'running'|'completed'|'error'|string; page:number; totalPages:number; processed:number; error?:string|null; updatedAt?:string }
+/**
+ * Trạng thái một nguồn catalog, trả về từ `GET /api/providers`. `healthy:false`
+ * nghĩa là circuit breaker đang tạm ngừng gọi nguồn đó, không phải nguồn đã chết
+ * hẳn — `openUntil` là lúc nó được thử lại.
+ */
+export interface SourceHealth { name:string; kind:'playable'|'metadata'; capabilities:string[]; healthy:boolean; failures:number; openUntil:string|null; lastError:string|null; lastSuccessAt:string|null }
 export type CatalogKind='home'|'list'|'genre'|'country'|'year'|'code';
 export interface CatalogQuery { kind:CatalogKind; value?:string; page?:number; limit?:number; year?:string; country?:string; category?:string; type?:string; status?:string }
