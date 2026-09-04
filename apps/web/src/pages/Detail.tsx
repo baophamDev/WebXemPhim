@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { Heart, LoaderCircle, Play, RefreshCw, Users } from 'lucide-react';
+import { Heart, Play, RefreshCw, Users } from 'lucide-react';
 import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFavoriteMutation } from '../api';
+import { previewFromState, recallMovie, rememberMovie } from '../preview';
 import type { CastMember, Episode, Movie } from '../types';
-import { Breadcrumb, clean, EmptyState, ErrorState, image, RailLabel, Shell, Spec } from '../ui';
+import { Breadcrumb, clean, EmptyState, ErrorState, image, ImportPanel, RailLabel, Shell, Spec, useImportProgress } from '../ui';
 
 function FavoriteButton({ movieId }: { movieId: number }) {
   const favorite = useGetFavoriteQuery(movieId);
@@ -34,7 +35,7 @@ function EpisodeList({ movie }: { movie: Movie }) {
     {groups.length ? groups.map(([server, episodes]) => <div className="server-group" key={server}>
       <h3>{server.trim()}</h3>
       <div className="episode-grid">
-        {episodes.map((episode) => <Link key={episode.id} to={`/watch/${movie.slug}/${episode.id}`}><Play />{episode.name}</Link>)}
+        {episodes.map((episode) => <Link key={episode.id} to={`/watch/${movie.slug}/${episode.id}`} state={{ preview: movie }}><Play />{episode.name}</Link>)}
       </div>
     </div>) : <EmptyState title="Chưa có nguồn phát" message="Bấm “Làm mới nguồn” để tải lại từ nguồn phim." />}
   </section>;
@@ -49,18 +50,64 @@ function CastLinks({ cast, names, kind }: { cast: CastMember[]; names: string[];
   return <>{names.join(', ') || 'Đang cập nhật'}</>;
 }
 
+/**
+ * Khung xương cho lúc chưa có cả bản mô tả (mở thẳng URL, hoặc F5 giữa trang).
+ * Vẫn dựng đúng hình khối của trang chi tiết thay vì một vòng xoay giữa màn hình:
+ * người xem thấy trang đang hình thành thì chờ được, thấy vòng xoay thì tưởng treo.
+ */
+function DetailSkeleton() {
+  return <section className="detail-hero skeleton" aria-hidden="true">
+    <div className="hero-veil" />
+    <div className="detail-inner">
+      <div className="detail-copy">
+        <span className="bone label" />
+        <span className="bone title" />
+        <span className="bone line" />
+        <span className="bone line short" />
+      </div>
+    </div>
+  </section>;
+}
+
 export default function Detail() {
   const { slug = '' } = useParams();
-  const pathname = useLocation().pathname;
+  const location = useLocation();
+  const pathname = location.pathname;
   const result = useGetMovieQuery(slug);
-  if (result.isLoading) return <Shell><div className="full-loader"><LoaderCircle className="spin" /></div></Shell>;
-  if (result.isError || !result.data?.movie) {
-    return <Shell><div className="page-container page-top"><ErrorState onRetry={result.refetch} message="Không mở được phim này." /></div></Shell>;
+  const fetched = result.data?.movie ?? null;
+  /**
+   * API trả 202 (`movie: null` kèm `importing`) khi phim chưa có trong kho: nó đã
+   * mở job nhập ở nền và không chặn request. Đó là tín hiệu để poll tiến trình.
+   */
+  const active = Boolean(result.data && !fetched);
+  const progress = useImportProgress(slug, active);
+  /**
+   * Bản mô tả của thẻ phim vừa bấm — có poster, tên, năm, điểm. Đủ để vẽ nửa trên
+   * của trang ngay khi điều hướng, trong lúc API còn đang kéo danh sách tập về.
+   */
+  const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
+  const movie: Movie | null = fetched ?? preview;
+  const failed = result.isError || Boolean(progress.failure);
+  // Nhớ bản đầy đủ: quay lại trang này (back/forward) là có ngay, không chờ mạng.
+  useEffect(() => { rememberMovie(fetched); }, [fetched]);
+
+  if (!movie) {
+    if (failed) {
+      return <Shell><div className="page-container page-top">
+        <ErrorState onRetry={() => { progress.retry(); result.refetch(); }} message={progress.failure || 'Không mở được phim này.'} />
+      </div></Shell>;
+    }
+    return <Shell flush>
+      <DetailSkeleton />
+      {active ? <div className="page-container detail-content"><ImportPanel progress={progress} onRetry={() => { progress.retry(); result.refetch(); }} /></div> : null}
+    </Shell>;
   }
-  const movie = result.data.movie;
+
   const cast = movie.cast ?? [];
   const actors = cast.filter((member) => member.kind === 'actor');
   const first = movie.episodes?.[0];
+  /** Chưa có bản trong kho: phần dưới trang là tiến trình tải, không phải "chưa có tập". */
+  const loading = !fetched;
 
   return <Shell flush>
     <section className="detail-hero">
@@ -76,16 +123,19 @@ export default function Detail() {
           <p className="description">{clean(movie.description) || 'Chưa có mô tả.'}</p>
           <div className="actions">
             {first
-              ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`}><Play fill="currentColor" />Xem ngay</Link>
-              : <button className="button primary" disabled><Play />Chưa có tập</button>}
-            <FavoriteButton movieId={movie.id} />
-            {pathname.startsWith('/movie/') ? <ImportButton slug={slug} /> : null}
+              ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`} state={{ preview: movie }}><Play fill="currentColor" />Xem ngay</Link>
+              : <button className="button primary" disabled><Play />{loading ? 'Đang tải nguồn phát' : 'Chưa có tập'}</button>}
+            {/* Lưu phim cần id trong kho — bản mô tả từ thẻ phim chưa có id. */}
+            {fetched ? <FavoriteButton movieId={fetched.id} /> : null}
+            {pathname.startsWith('/movie/') && !loading ? <ImportButton slug={slug} /> : null}
           </div>
         </div>
       </div>
     </section>
     <div className="page-container detail-content">
-      <EpisodeList movie={movie} />
+      {loading
+        ? <ImportPanel progress={progress} onRetry={() => { progress.retry(); result.refetch(); }} />
+        : <EpisodeList movie={movie} />}
       <section className="detail-info">
         <div>
           <RailLabel prefix="THÔNG TIN">Chi tiết</RailLabel>

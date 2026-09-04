@@ -154,6 +154,143 @@ test('status() liệt kê đúng khả năng của từng nguồn', async () => 
   assert.equal(metadata.kind, 'metadata');
 });
 
+// ---------------------------------------------------------------------------
+// prefer(): "đổi nguồn" theo nghĩa ưu tiên, không phải khoá cứng.
+// ---------------------------------------------------------------------------
+
+/** Ba nguồn ghi lại thứ tự mình được hỏi, để đọc ra thứ tự ưu tiên thật. */
+function orderedSources(asked) {
+  return [
+    { name: 'vsmov', kind: 'playable', latest: async () => { asked.push('vsmov'); return page([movie()]); } },
+    { name: 'tmdb', kind: 'metadata', latest: async () => { asked.push('tmdb'); return page([movie()]); } },
+    { name: 'tvdb', kind: 'metadata', latest: async () => { asked.push('tvdb'); return page([movie()]); } }
+  ];
+}
+
+test('prefer() đưa nguồn được chọn lên đầu, phần còn lại giữ nguyên thứ tự', async () => {
+  const asked = [];
+  const catalog = new CatalogResolver(orderedSources(asked));
+  assert.deepEqual(catalog.prefer('tvdb').names, ['tvdb', 'vsmov', 'tmdb']);
+  const result = await catalog.prefer('tvdb').latest(1);
+  assert.equal(result.source, 'tvdb');
+  assert.deepEqual(asked, ['tvdb']);
+});
+
+test('prefer() không truyền gì hoặc "auto" thì dùng đúng thứ tự CATALOG_SOURCES', async () => {
+  const asked = [];
+  const catalog = new CatalogResolver(orderedSources(asked));
+  // Cùng một object: `auto` không được tạo bản xem mới, nếu không thì mỗi request
+  // tự dựng một resolver rồi bảng sức khoẻ chia làm nhiều bản.
+  assert.equal(catalog.prefer('auto'), catalog);
+  assert.equal(catalog.prefer(null), catalog);
+  assert.equal(catalog.prefer('  '), catalog);
+  assert.equal(catalog.prefer('  AUTO  '), catalog);
+  assert.equal((await catalog.latest(1)).source, 'vsmov');
+});
+
+test('prefer() nhận tên viết hoa và có khoảng trắng', async () => {
+  const catalog = new CatalogResolver(orderedSources([]));
+  assert.deepEqual(catalog.prefer('  TMDB ').names, ['tmdb', 'vsmov', 'tvdb']);
+});
+
+test('prefer() tên nguồn không đang bật: lỗi 400 kể ra các nguồn đang bật', () => {
+  const catalog = new CatalogResolver(orderedSources([]));
+  assert.throws(() => catalog.prefer('mdl'), (error) => {
+    assert.equal(error.status, 400);
+    assert.match(error.message, /mdl/);
+    // Người gõ sai tên cần biết mình được chọn những gì, không chỉ biết mình sai.
+    assert.match(error.message, /vsmov, tmdb, tvdb/);
+    return true;
+  });
+});
+
+test('prefer() mỗi nguồn chỉ dựng một bản xem, dùng lại cho các request sau', () => {
+  const catalog = new CatalogResolver(orderedSources([]));
+  assert.equal(catalog.prefer('tmdb'), catalog.prefer('tmdb'));
+  assert.notEqual(catalog.prefer('tmdb'), catalog.prefer('tvdb'));
+});
+
+test('prefer() dùng chung sức khoẻ nguồn với resolver gốc', async () => {
+  let deadCalls = 0;
+  const catalog = new CatalogResolver([
+    { name: 'dead', kind: 'metadata', latest: async () => { deadCalls += 1; throw new Error('sập'); } },
+    { name: 'alive', kind: 'playable', latest: async () => page([movie()]) }
+  ]);
+  // Ba lần lỗi ở bản xem "ưu tiên dead" phải làm nguồn đó ngừng ở *mọi* bản xem:
+  // circuit breaker mà tính riêng theo từng lựa chọn nguồn thì mỗi người dùng lại
+  // phải tự chờ hết ba lần timeout của cùng một nguồn đã chết.
+  const preferred = catalog.prefer('dead');
+  for (let round = 0; round < 3; round += 1) await preferred.latest(1);
+  assert.equal(deadCalls, 3);
+
+  const shared = catalog.status().find((row) => row.name === 'dead');
+  assert.equal(shared.healthy, false);
+  assert.equal(shared.failures, 3);
+  assert.equal((await catalog.latest(1)).source, 'alive');
+  assert.equal(deadCalls, 3, 'resolver gốc không được gọi lại nguồn đang bị ngừng');
+});
+
+test('prefer() dùng chung cặp slug đã khớp với resolver gốc', async () => {
+  const { calls, catalog } = reconcilingSources(movie({
+    provider: 'meta', slug: 'dien-hy-cong-luoc-t900', name: 'Diên Hy Công Lược', year: 2018
+  }));
+  await catalog.detail('dien-hy-cong-luoc');
+  assert.equal(calls.search, 1);
+  calls.detail.length = 0;
+
+  // Đổi nguồn ưu tiên rồi mở lại đúng phim đó: đã biết slug bên kia là gì, không
+  // được đi tìm lại từ đầu.
+  const found = await catalog.prefer('meta').detail('dien-hy-cong-luoc');
+  assert.equal(calls.search, 1, 'không được gọi search lần thứ hai');
+  assert.deepEqual(calls.detail, ['dien-hy-cong-luoc-t900']);
+  assert.equal(found.movie.rating, 8.3);
+});
+
+test('prefer() một nguồn metadata vẫn không làm mất nút play', async () => {
+  const catalog = new CatalogResolver([
+    {
+      name: 'phat', kind: 'playable',
+      detail: async (slug) => ({ movie: movie({ provider: 'phat', slug, name: 'Phim A' }), episodes: episodes(4) })
+    },
+    {
+      name: 'meta', kind: 'metadata',
+      detail: async (slug) => ({ movie: movie({ provider: 'meta', slug, name: 'Phim A', rating: 8.1 }), episodes: [] })
+    }
+  ]);
+  const found = await catalog.prefer('meta').detail('phim-a');
+  // Ưu tiên chỉ đổi thứ tự trong từng nhóm; nhóm nguồn phát vẫn được hỏi trước cả
+  // nhóm metadata, nên chọn TMDB/TVDB không bao giờ đổi lấy việc mất tập phim.
+  assert.equal(found.source, 'phat');
+  assert.equal(found.playable, true);
+  assert.equal(found.episodes[0].server_data.length, 4);
+  assert.equal(found.movie.rating, 8.1);
+});
+
+test('prefer() chỉ đổi thứ tự, không loại nguồn nào: nguồn đầu lỗi vẫn lùi được', async () => {
+  const asked = [];
+  const catalog = new CatalogResolver([
+    { name: 'vsmov', kind: 'playable', latest: async () => { asked.push('vsmov'); return page([movie()]); } },
+    { name: 'tvdb', kind: 'metadata', latest: async () => { asked.push('tvdb'); throw new Error('không có mục này'); } }
+  ]);
+  const result = await catalog.prefer('tvdb').latest(1);
+  assert.deepEqual(asked, ['tvdb', 'vsmov']);
+  assert.equal(result.source, 'vsmov');
+});
+
+test('detail: slug trả về luôn là slug đã yêu cầu, dù nguồn đặt tên khác', async () => {
+  const catalog = new CatalogResolver([{
+    name: 'phat', kind: 'playable',
+    detail: async () => ({
+      movie: movie({ provider: 'phat', slug: 'slug-rieng-cua-nguon' }), episodes: episodes(2)
+    })
+  }]);
+  const found = await catalog.detail('slug-tren-url');
+  // DB định danh phim bằng slug và URL đang mở là slug này: đổi nó ở đây là ghi một
+  // bản ghi mà route vừa gọi không tìm lại được.
+  assert.equal(found.movie.slug, 'slug-tren-url');
+  assert.equal(found.playable, true);
+});
+
 test('detail: nguồn phát làm gốc dù nguồn metadata đứng trước', async () => {
   const catalog = new CatalogResolver([
     {

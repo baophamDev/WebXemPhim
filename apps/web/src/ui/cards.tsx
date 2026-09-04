@@ -2,6 +2,8 @@
 import { Link } from 'react-router-dom';
 import { Play, Star } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { usePrefetch } from '../api';
+import { rememberMovie } from '../preview';
 import type { Movie } from '../types';
 import { image } from './format';
 
@@ -21,9 +23,25 @@ export function Spec({ movie }: { movie: Movie }) {
 }
 
 export function MovieCard({ movie, rank }: { movie: Movie; rank?: number }) {
+  const prefetch = usePrefetch('getMovie');
+  /**
+   * `pointerdown` là tín hiệu chắc chắn nhất mà vẫn đến **trước** lúc router đổi
+   * trang (navigation xảy ra ở `click`, tức là ở mouseup). Nhờ vậy job nhập phim ở
+   * API đã bắt đầu trước khi trang chi tiết mở ra, và cú bấm mua được vài trăm ms.
+   *
+   * Cố tình không prefetch khi mới trỏ chuột vào: kéo chuột ngang một dải phim là
+   * 20 thẻ, thành 20 job nhập ở nguồn ngoài cho những phim không ai định xem.
+   */
+  const warm = () => { rememberMovie(movie); prefetch(movie.slug); };
   // draggable=false: thẻ nằm trong dải kéo ngang được, mà mặc định trình duyệt
   // cho kéo cả link và ảnh — ảnh mờ bay theo con trỏ làm cú kéo trông như lỗi.
-  return <Link className="movie-card" to={`/movie/${movie.slug}`} draggable={false} aria-label={`Chi tiết ${movie.name}`}>
+  return <Link
+    className="movie-card" to={`/movie/${movie.slug}`} draggable={false} aria-label={`Chi tiết ${movie.name}`}
+    // Bản mô tả đi kèm cú điều hướng: trang chi tiết vẽ được poster/tên/năm ngay,
+    // không phải đợi API. Xem `src/preview.ts`.
+    state={{ preview: movie }}
+    onPointerDown={warm} onClick={() => rememberMovie(movie)}
+  >
     {rank ? <span className="rank">{rank}</span> : null}
     <div className="poster">
       <img

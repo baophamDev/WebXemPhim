@@ -12,6 +12,10 @@ Pipeline nằm ở `.github/workflows/ci.yml`, chạy trên GitHub Actions.
 Job `build` chạy `npm ci` → `npm run typecheck` → `npm test` → `npm run build` trên Node 22,
 và upload `apps/web/dist` làm artifact (giữ 7 ngày) để đối chiếu khi cần.
 
+`npm test` không cần secret nào: mọi test của tầng nguồn tự đặt khoá API giả và thay
+`globalThis.fetch` bằng một router theo pathname, nên adapter cần khoá (TMDB, TheTVDB)
+vẫn chạy đủ trên CI. Không có test nào đi ra mạng hay cần database.
+
 Job `lint` chạy `npm run lint` (ESLint 9, cấu hình `eslint.config.mjs`) song song với
 `build` và **không** chặn deploy: cấu hình ESLint được viết offline nên lần chạy thật đầu
 tiên chính là ở đây. Khi job đã xanh một lần, đổi `needs: build` của hai job deploy thành

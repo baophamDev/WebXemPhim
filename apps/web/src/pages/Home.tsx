@@ -37,7 +37,7 @@ function NextUp({ items }: { items: Movie[] }) {
   return <div className="next-up">
     <RailLabel prefix="TIẾP THEO">Xem gì nữa</RailLabel>
     <div className="next-grid">
-      {items.map((movie) => <Link key={movie.slug} to={`/movie/${movie.slug}`}>
+      {items.map((movie) => <Link key={movie.slug} to={`/movie/${movie.slug}`} state={{ preview: movie }}>
         <div><img src={image(movie, true) || '/poster-placeholder.svg'} alt={movie.name} loading="lazy" decoding="async" sizes="180px" /></div>
         <b>{movie.name}</b>
       </Link>)}
@@ -75,8 +75,8 @@ export default function Home() {
               <Spec movie={featured} />
               <p className="description">{clean(featured.description) || `Xem ${featured.name} ngay trên kho phim của gia đình.`}</p>
               <div className="actions">
-                <Link className="button primary" to={`/movie/${featured.slug}`}><Play fill="currentColor" />Phát</Link>
-                <Link className="button ghost" to={`/movie/${featured.slug}`}><Film />Chi tiết</Link>
+                <Link className="button primary" to={`/movie/${featured.slug}`} state={{ preview: featured }}><Play fill="currentColor" />Phát</Link>
+                <Link className="button ghost" to={`/movie/${featured.slug}`} state={{ preview: featured }}><Film />Chi tiết</Link>
               </div>
               <NextUp items={next} />
             </aside>

@@ -13,3 +13,5 @@ export { MovieCard, RailLabel, Spec } from './cards';
 export { MovieRow } from './Rail';
 export { EmptyState, ErrorState, RouteFallback, SkeletonGrid, SyncStatus } from './states';
 export { BackToTop, Breadcrumb, Pagination } from './nav';
+export { ImportPanel, TopProgress, useImportProgress, type ImportProgress } from './progress';
+export { SourcePicker, ThemePicker } from './pickers';

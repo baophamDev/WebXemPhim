@@ -31,6 +31,10 @@
   --gold: #ffdf9e;
   --on-amber: #17110a;
   --warn: #ff9f1a;
+  /* Xanh chỉ dùng cho đèn trạng thái nguồn, không bao giờ cho chữ hay nút: thêm
+     một màu thứ ba vào bảng ấm là phá bảng, nhưng "nguồn đang sống" thì không có
+     cách nào nói bằng vàng khi vàng đã là màu của mọi thứ đang bật. */
+  --ok: #3fb27f;
   --chrome: linear-gradient(100deg, var(--ember), var(--amber) 62%, var(--gold));
 
   /* Kính mờ: panel thông tin bên phải hero nằm trên ảnh nên phải tự sáng. */
@@ -60,17 +64,94 @@
   /* Hai đầu dải phim mờ dần, luôn phủ quá lề nội dung một chút. */
   --rail-fade: calc(var(--pad-x) + 12px);
 
+  /* Nền ngoài khung poster, và bộ ba RGB của --void để các lớp phủ pha được alpha
+     — `rgb(var(--veil) / .78)`. Gộp thành token vì chế độ sáng phải đổi cả những
+     lớp phủ này: phủ tối lên ảnh rồi đặt chữ tối lên trên là không đọc được. */
+  --page: #050403;
+  --veil: 11 8 6;
+  /* Lớp mỏng đắp lên nền cho nút và ô nhập: bản tối là trắng mờ, bản sáng là nâu mờ. */
+  --tint: rgba(255, 255, 255, .06);
+  --tint-soft: rgba(255, 255, 255, .04);
+  --title-shadow: rgba(0, 0, 0, .55);
+  --scan: rgba(255, 197, 61, .08);
+  --backdrop: rgba(5, 4, 3, .78);
+
   font-family: var(--f-body);
   color: var(--ink);
-  background: #050403;
+  background: var(--page);
   font-synthesis: none;
+  color-scheme: dark;
+}
+
+/* --- Chế độ sáng -------------------------------------------------------- */
+/* `data-theme` được src/theme.ts sơn lên <html> trước lần render đầu của React.
+   Ở đây chỉ đổi token, không viết lại bộ quy tắc thứ hai: mọi khối bên dưới đều
+   đọc qua biến nên tự đi theo.
+
+   Bảng sáng là bản in trên giấy của cùng một rạp: nền kem ấm, chữ nâu espresso,
+   vàng và cam **đậm hơn hẳn** bản tối. #ffc53d trên giấy chỉ được 1.7:1 — nó là
+   màu để tô nền, không phải màu để đọc, mà token này còn dùng cho chữ nhãn và
+   trạng thái hover. Nên bản sáng hạ nó xuống nâu-hổ phách, và --on-amber (chữ
+   nằm *trên* nền vàng) lật ngược thành màu kem. */
+:root[data-theme='light'] {
+  --void: #faf6f0;
+  --carbon: #f3ece2;
+  --slab: #ece2d5;
+  --slab-2: #e2d5c4;
+
+  --edge: #dbcdba;
+  --edge-hi: #bfa88d;
+  --track: #c9b49b;
+
+  --ink: #1f150e;
+  --ink-dim: #5b4636;
+  /* 4.6:1 trên --void — vẫn là ngưỡng cho nhãn 11px như bản tối. */
+  --ink-faint: #7a6350;
+
+  --amber: #b45309;
+  --ember: #c2410c;
+  --gold: #8f4a0a;
+  --on-amber: #fff8ec;
+  --warn: #9a3412;
+  --ok: #157f52;
+
+  --glass: rgba(255, 251, 245, .74);
+  --glass-edge: rgba(180, 83, 9, .2);
+
+  --page: #e5dbcb;
+  --veil: 250 245 237;
+  --tint: rgba(31, 21, 14, .05);
+  --tint-soft: rgba(31, 21, 14, .035);
+  --title-shadow: rgba(255, 252, 246, .8);
+  --scan: rgba(146, 64, 14, .07);
+  --backdrop: rgba(43, 30, 18, .42);
+  color-scheme: light;
+}
+
+/* Trang xem phim là hòn đảo tối trong cả hai chế độ: khung của trình phát phải
+   lùi ra sau hình ảnh chứ không tranh sáng với nó. Khai lại token ngay trên
+   .watch-page là cả cây con đi theo, không cần nhân bản quy tắc. */
+:root[data-theme='light'] .watch-page,
+:root[data-theme='light'] .watch-loading {
+  --void: #0b0806;
+  --carbon: #120d09;
+  --slab: #1b1310;
+  --slab-2: #241a14;
+  --edge: #2f231b;
+  --edge-hi: #4d372a;
+  --ink: #f7f0e7;
+  --ink-dim: #bda98f;
+  --ink-faint: #8f7863;
+  --amber: #ffc53d;
+  --gold: #ffdf9e;
+  --on-amber: #17110a;
   color-scheme: dark;
 }
 
 /* --- Nền tảng ----------------------------------------------------------- */
 * { box-sizing: border-box; }
-html { background: #050403; }
-body { margin: 0; min-width: 320px; background: #050403; color: var(--ink); }
+html { background: var(--page); }
+body { margin: 0; min-width: 320px; background: var(--page); color: var(--ink); }
 button, input, select { font: inherit; }
 button { cursor: pointer; color: inherit; }
 button:disabled { cursor: not-allowed; opacity: .45; }
@@ -109,11 +190,11 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: up
 .app-header {
   position: relative; z-index: 50; height: var(--header-h); flex-shrink: 0;
   display: flex; align-items: center; gap: 28px; padding: 0 var(--pad-x);
-  background: rgba(11, 8, 6, .92); border-bottom: 1px solid var(--edge);
+  background: rgb(var(--veil) / .92); border-bottom: 1px solid var(--edge);
 }
 .app-frame.flush .app-header {
   position: absolute; inset: 0 0 auto; height: var(--header-h);
-  background: linear-gradient(rgba(11, 8, 6, .72), rgba(11, 8, 6, 0)); border-bottom: 0;
+  background: linear-gradient(rgb(var(--veil) / .72), rgb(var(--veil) / 0)); border-bottom: 0;
 }
 .logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .logo span {
@@ -132,23 +213,78 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: up
   text-transform: uppercase; color: var(--ink-dim);
 }
 .main-nav a svg { width: 15px; }
-.main-nav a:hover { color: var(--ink); background: rgba(255, 255, 255, .06); }
+.main-nav a:hover { color: var(--ink); background: var(--tint); }
 .main-nav a.active { color: var(--on-amber); background: var(--amber); }
 .header-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .header-search {
   display: flex; align-items: center; gap: 9px; width: 250px; height: 40px; padding: 0 15px;
-  background: rgba(255, 255, 255, .06); border: 1px solid var(--edge); border-radius: var(--r-pill);
+  background: var(--tint); border: 1px solid var(--edge); border-radius: var(--r-pill);
 }
 .header-search:focus-within { border-color: var(--edge-hi); }
 .header-search svg { width: 16px; color: var(--ink-faint); }
 .header-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: none; color: var(--ink); font-size: 13px; }
 .icon-button {
   display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, .06); border: 1px solid var(--edge);
+  background: var(--tint); border: 1px solid var(--edge);
 }
 .icon-button:hover { border-color: var(--amber); color: var(--amber); }
 .icon-button svg { width: 18px; }
 .menu-button, .nav-close, .nav-backdrop, .mobile-search { display: none; }
+
+/* --- Hai nút chọn trong thanh trên: nguồn phim và chế độ sáng/tối -------- */
+/* Chung một khối CSS vì chung hình khối và chung cách mở; chỉ khác nội dung menu.
+   Nút mang cả `.icon-button` nên đã có nền, viền và bo tròn — ở đây chỉ nới ngang
+   ra cho vừa chữ. */
+.picker { position: relative; flex-shrink: 0; }
+.picker-button {
+  display: flex; align-items: center; gap: 7px; width: auto; min-width: 40px; padding: 0 11px;
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.picker-button svg { width: 16px; flex-shrink: 0; }
+.picker-button .picker-caret { width: 12px; opacity: .55; }
+.picker-value { max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-button[aria-expanded='true'] { border-color: var(--amber); color: var(--amber); }
+.picker-menu {
+  position: absolute; z-index: 70; top: calc(100% + 8px); right: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  width: 272px; max-height: min(60vh, 440px); overflow-y: auto; padding: 8px;
+  background: var(--carbon); border: 1px solid var(--edge-hi); border-radius: var(--r);
+  box-shadow: 0 18px 44px rgb(var(--veil) / .5);
+  animation: rise .16s ease-out both;
+}
+.picker-menu.compact { width: 222px; }
+.picker-hint {
+  margin: 2px 6px 8px; font-family: var(--f-mono); font-size: 10px; line-height: 1.65;
+  letter-spacing: .03em; color: var(--ink-faint);
+}
+/* Tên nguồn đang trả lời, nằm ngay trong câu giải thích cơ chế lùi nguồn. */
+.picker-hint b { font-weight: 500; color: var(--amber); }
+/* Ba cột: đèn/biểu tượng — nhãn — dấu tích. Dòng phụ tụt xuống hàng dưới và ăn
+   hết bề ngang còn lại, nên lý do dài không đẩy dấu tích ra khỏi menu. */
+.picker-menu button {
+  display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 3px 9px;
+  padding: 9px 10px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; color: var(--ink);
+}
+.picker-menu button b { font-family: var(--f-mono); font-size: 12px; font-weight: 500; letter-spacing: .06em; }
+.picker-menu button small {
+  grid-column: 2 / -1; font-family: var(--f-mono); font-size: 10px; letter-spacing: .03em;
+  line-height: 1.5; color: var(--ink-faint);
+}
+.picker-menu button:hover:not(:disabled) { background: var(--tint); }
+.picker-menu button.on { background: var(--tint); }
+.picker-menu button.on b { color: var(--amber); }
+.picker-menu button.off { color: var(--ink-faint); }
+.picker-tick { grid-row: 1; grid-column: 3; width: 14px; color: var(--amber); }
+.picker-glyph { grid-column: 1; width: 14px; }
+/* Đèn trạng thái nguồn. Màu không bao giờ là thông tin duy nhất — chữ ngay bên
+   cạnh luôn nói rõ "chỉ thông tin", "đang tạm ngừng" hay lý do chưa bật. */
+.dot { justify-self: center; width: 8px; height: 8px; border-radius: var(--r-pill); background: var(--ink-faint); }
+.dot.ok { background: var(--ok); }
+.dot.warn { background: var(--warn); }
+.dot.off { background: var(--edge-hi); }
+/* Chọn nguồn này nhưng nguồn khác đang trả lời: không phải lỗi nên không dùng --warn. */
+.dot.alt { background: var(--amber); }
 
 /* --- Khung trang -------------------------------------------------------- */
 main { flex: 1; min-height: 0; }
@@ -168,8 +304,8 @@ main.flush { padding-top: 0; }
 .hero-veil {
   position: absolute; inset: 0;
   background:
-    linear-gradient(96deg, var(--void) 0%, rgba(11, 8, 6, .78) 38%, rgba(11, 8, 6, .1) 76%),
-    linear-gradient(0deg, var(--void) 2%, rgba(11, 8, 6, .35) 34%, transparent 62%);
+    linear-gradient(96deg, var(--void) 0%, rgb(var(--veil) / .78) 38%, rgb(var(--veil) / .1) 76%),
+    linear-gradient(0deg, var(--void) 2%, rgb(var(--veil) / .35) 34%, transparent 62%);
 }
 .hero-layout {
   position: relative; width: min(1440px, 100%); margin: 0 auto;
@@ -187,7 +323,7 @@ main.flush { padding-top: 0; }
 .hero-title {
   margin: 0 0 22px; font-family: var(--f-poster); font-weight: 400;
   font-size: clamp(44px, 7.4vw, 108px); line-height: .92; letter-spacing: .005em;
-  text-wrap: balance; text-shadow: 0 6px 40px rgba(0, 0, 0, .55);
+  text-wrap: balance; text-shadow: 0 6px 40px var(--title-shadow);
 }
 .hero-accent { color: var(--ember); font-style: normal; }
 .hero-title.detail { font-family: var(--f-display); font-size: clamp(36px, 6vw, 82px); line-height: 1; }
@@ -259,7 +395,7 @@ main.flush { padding-top: 0; }
 .button svg { width: 17px; height: 17px; }
 .button.primary { background: var(--amber); color: var(--on-amber); }
 .button.primary:hover:not(:disabled) { background: var(--gold); }
-.button.ghost { background: rgba(255, 255, 255, .04); border-color: var(--edge-hi); color: var(--ink); }
+.button.ghost { background: var(--tint-soft); border-color: var(--edge-hi); color: var(--ink); }
 .button.ghost:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
 .button.ghost.active { border-color: var(--amber); color: var(--amber); }
 
@@ -304,7 +440,7 @@ main.flush { padding-top: 0; }
    lên poster — ảnh phim phải sạch. */
 .rail-ticks::before, .to-top::before {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: repeating-linear-gradient(180deg, rgba(255, 197, 61, .08) 0 1px, transparent 1px 3px);
+  background: repeating-linear-gradient(180deg, var(--scan) 0 1px, transparent 1px 3px);
 }
 .rail-count {
   display: grid; place-items: center; padding: 0 11px; background: var(--carbon);
@@ -391,7 +527,7 @@ main.flush { padding-top: 0; }
 .movie-card:hover .card-play, .movie-card:focus-visible .card-play { opacity: 1; }
 .badges { position: absolute; z-index: 3; left: 8px; top: 8px; display: flex; gap: 5px; max-width: calc(100% - 16px); }
 .badges b {
-  padding: 4px 8px; background: rgba(11, 8, 6, .82); border-radius: var(--r-pill);
+  padding: 4px 8px; background: rgb(var(--veil) / .82); border-radius: var(--r-pill);
   font-family: var(--f-mono); font-size: 9px; font-weight: 500; letter-spacing: .1em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -450,6 +586,67 @@ main.flush { padding-top: 0; }
   font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
 }
 .sync-status button:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+
+/* --- Tiến trình "tải phim" ----------------------------------------------- */
+/* Cùng ngôn hình với .sync-status (khối slab, nẹp sáng bên trái) vì cùng một vai:
+   web đang làm việc ở nền và đang kể lại nó làm gì. */
+.import-panel {
+  width: min(100%, 520px); margin: 0 0 44px; padding: 16px 18px; border-radius: var(--r);
+  background: var(--slab); border: 1px solid var(--edge); border-left: 3px solid var(--amber);
+  animation: rise .24s ease-out both;
+}
+.import-panel header { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+.import-panel header svg { width: 17px; flex-shrink: 0; color: var(--amber); }
+.import-panel header b {
+  flex-shrink: 0; font-family: var(--f-mono); font-size: 12px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.import-source {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .08em; color: var(--amber);
+}
+/* Số giây bám lề phải và dùng chữ số đều bề ngang: mỗi giây đổi một lần, chữ số
+   so le thì cả dòng nhảy qua nhảy lại. */
+.import-panel header small {
+  margin-left: auto; font-family: var(--f-mono); font-size: 11px;
+  font-variant-numeric: tabular-nums; color: var(--ink-faint);
+}
+.import-bar { position: relative; overflow: hidden; height: 6px; border-radius: var(--r-pill); background: var(--carbon); }
+/* Vạch có một lớp bóng chạy ngang: một chặng có thể đứng tại chỗ vài chục giây
+   khi nguồn ngoài chưa trả lời, mà thanh đứng im thì trông như đã treo. */
+.import-bar i {
+  position: relative; display: block; height: 100%; border-radius: var(--r-pill);
+  background: var(--chrome); transition: width .5s cubic-bezier(.3, .8, .3, 1);
+}
+.import-bar i::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .45) 50%, transparent);
+  animation: sweep 1.5s linear infinite;
+}
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.import-stage {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 11px 0 0;
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; color: var(--ink-dim);
+}
+.import-ticks { display: flex; flex-shrink: 0; gap: 3px; }
+.import-ticks i { width: 10px; height: 3px; background: var(--track); }
+.import-ticks i.on { background: var(--amber); }
+.import-panel.failed { border-left-color: var(--warn); }
+.import-panel.failed header svg { color: var(--warn); }
+.import-reason { margin: 0 0 14px; font-size: 13px; line-height: 1.7; color: var(--ink-dim); }
+.import-panel .button { min-height: 40px; }
+
+/* --- Vạch tiến trình trên đỉnh trang ------------------------------------- */
+/* 2px, `fixed`, nằm ngoài cả khung poster: đây là đèn báo của trình duyệt, không
+   phải một phần của trang. Không đo được tiến độ thật của một request nên vạch
+   chạy qua lại — nó chỉ trả lời đúng một câu: còn đang chờ hay không. */
+.top-progress {
+  position: fixed; z-index: 90; inset: 0 0 auto; height: 2px; overflow: hidden;
+  pointer-events: none; opacity: 0; transition: opacity .25s;
+}
+.top-progress.on { opacity: 1; }
+.top-progress i { display: block; width: 34%; height: 100%; background: var(--chrome); animation: glide 1.15s ease-in-out infinite; }
+@keyframes glide { from { transform: translateX(-110%); } to { transform: translateX(400%); } }
 
 /* --- Đường dẫn & tiêu đề trang ------------------------------------------ */
 .breadcrumb {
@@ -580,6 +777,19 @@ main.flush { padding-top: 0; }
 .info-row span { color: var(--ink); }
 .info-row a:hover { color: var(--amber); }
 
+/* Khung xương trang chi tiết: dựng đúng hình khối của trang thật (đầu trang cao,
+   nhãn, tiêu đề khổ lớn, hai dòng mô tả) thay vì một vòng xoay giữa màn hình.
+   Chỉ dùng khi mở thẳng URL hoặc F5 — bấm từ thẻ phim thì đã có ảnh và tên. */
+.detail-hero.skeleton {
+  background: linear-gradient(110deg, var(--carbon), var(--slab-2), var(--carbon));
+  background-size: 220% 100%; animation: shine 1.6s infinite;
+}
+.bone { display: block; border-radius: var(--r-pill); background: var(--slab-2); }
+.bone.label { width: 128px; height: 11px; margin-bottom: 18px; }
+.bone.title { width: min(560px, 82%); height: clamp(38px, 6vw, 74px); margin-bottom: 22px; border-radius: var(--r-sm); }
+.bone.line { width: min(520px, 90%); height: 12px; margin-bottom: 10px; }
+.bone.line.short { width: min(300px, 58%); }
+
 /* --- Thư viện cá nhân --------------------------------------------------- */
 .library-section { margin-bottom: 52px; }
 .continue-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
@@ -589,7 +799,7 @@ main.flush { padding-top: 0; }
 .continue-grid > a:hover img { transform: scale(1.03); }
 .continue-grid > a > div {
   position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 11px; padding: 14px;
-  background: linear-gradient(transparent, rgba(11, 8, 6, .92));
+  background: linear-gradient(transparent, rgb(var(--veil) / .92));
 }
 .continue-grid > a > div > svg { width: 30px; height: 30px; padding: 8px; border-radius: var(--r-pill); background: var(--amber); color: var(--on-amber); flex-shrink: 0; }
 .continue-grid span { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
@@ -655,6 +865,9 @@ footer > div a:hover { color: var(--amber); }
   .main-nav a { padding: 9px 8px; }
   .main-nav a svg { display: none; }
   .header-search { width: 200px; }
+  /* Tên nguồn là thứ đầu tiên bỏ khi thanh trên hẹp lại: biểu tượng + menu vẫn
+     nói đủ, còn ô tìm kiếm thì không thu nhỏ thêm được nữa. */
+  .picker-value { display: none; }
   .detail-info { gap: 40px; }
 }
 @media (max-width: 1020px) {
@@ -678,9 +891,13 @@ footer > div a:hover { color: var(--amber); }
   .main-nav a svg { display: block; width: 18px; }
   .main-nav a.active { background: none; color: var(--amber); }
   .nav-close { display: grid; position: absolute; top: 14px; right: 14px; }
-  .nav-backdrop.open { display: block; position: fixed; inset: 0; z-index: 55; height: 100dvh; border: 0; background: rgba(5, 4, 3, .78); }
+  .nav-backdrop.open { display: block; position: fixed; inset: 0; z-index: 55; height: 100dvh; border: 0; background: var(--backdrop); }
   .menu-button, .mobile-search { display: grid; }
   .header-search, .desktop-icon { display: none; }
+  /* Hai nút chọn thu về đúng một biểu tượng tròn như các nút khác trong thanh. */
+  .picker-button { width: 40px; padding: 0; justify-content: center; }
+  .picker-button .picker-caret { display: none; }
+  .picker-menu, .picker-menu.compact { width: min(272px, calc(100vw - 2 * var(--pad-x))); }
   body.menu-open { overflow: hidden; }
   .hero, .detail-hero { min-height: 76vh; }
   .hero-copy, .detail-copy { width: 100%; }

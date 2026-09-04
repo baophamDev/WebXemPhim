@@ -16,11 +16,15 @@
  *    phim. `detail(slug)` thử đúng slug ở từng nguồn; nguồn nào không biết slug đó
  *    thì tìm lại bằng tên + năm rồi lấy slug của chính nó. Nhờ vậy poster/điểm/dàn
  *    diễn viên từ nguồn metadata ghép được vào phim của nguồn phát.
+ * 4. **Bản xem theo nguồn ưu tiên.** `prefer('tmdb')` trả về một resolver khác chỉ
+ *    khác thứ tự nguồn, dùng chung sức khoẻ và bảng slug. Nhờ vậy người dùng đổi
+ *    nguồn ở web mà không nguồn nào bị khoá cứng: chọn sai/nguồn chết thì vẫn rơi
+ *    xuống nguồn sau như thường.
  */
 import { httpError } from '../errors.js';
 import { checkDetail, checkList, checkTaxonomy, enrich, episodeCount, MATCH_THRESHOLD, matchScore } from './normalize.js';
 import type {
-  Capability, CatalogFilters, CatalogSource, ListPage, MovieSummary, SourceDetail, SourceHealth, Taxonomy
+  Capability, CatalogFilters, CatalogSource, DetailStage, ListPage, MovieSummary, SourceDetail, SourceHealth, Taxonomy
 } from './types.js';
 
 const FAILURE_THRESHOLD = 3;
@@ -44,19 +48,61 @@ export interface ResolvedDetail extends SourceDetail {
   playable: boolean;
 }
 
-export class CatalogResolver {
-  private readonly health = new Map<string, Health>();
-  /** `slug của nguồn gốc` → `{ tên nguồn: slug của nguồn đó }`, để khỏi tìm lại mỗi lần. */
-  private readonly slugMap = new Map<string, Record<string, string>>();
+/** Báo chặng đang chạy của `detail()` ra ngoài, xem `importer.ts`. */
+export type StageReporter = (stage: DetailStage, source: string | null) => void;
 
-  constructor(readonly sources: CatalogSource[]) {
+/**
+ * Trạng thái dùng chung giữa các bản xem của cùng một registry. Truyền bằng tham
+ * chiếu, không copy: nguồn chết ở bản xem này thì bản xem khác cũng biết ngay,
+ * nếu không thì mỗi lần đổi nguồn ở web lại có một circuit breaker trắng và cả
+ * cái cơ chế đó thành vô nghĩa.
+ */
+interface SharedState {
+  health: Map<string, Health>;
+  slugMap: Map<string, Record<string, string>>;
+}
+
+export class CatalogResolver {
+  private readonly health: Map<string, Health>;
+  /** `slug của nguồn gốc` → `{ tên nguồn: slug của nguồn đó }`, để khỏi tìm lại mỗi lần. */
+  private readonly slugMap: Map<string, Record<string, string>>;
+  /** Bản xem đã dựng, khoá theo tên nguồn ưu tiên — mỗi request không dựng lại. */
+  private readonly views = new Map<string, CatalogResolver>();
+
+  constructor(readonly sources: CatalogSource[], shared?: SharedState) {
+    this.health = shared?.health ?? new Map();
+    this.slugMap = shared?.slugMap ?? new Map();
     for (const source of sources) {
+      if (this.health.has(source.name)) continue;
       this.health.set(source.name, { failures: 0, openUntil: 0, lastError: null, lastSuccessAt: null });
     }
   }
 
   get names(): string[] {
     return this.sources.map((source) => source.name);
+  }
+
+  /**
+   * Bản xem cùng dữ liệu sức khoẻ nhưng đưa `name` lên đầu thứ tự ưu tiên. Không
+   * truyền gì (hoặc `auto`) thì dùng đúng thứ tự `CATALOG_SOURCES`.
+   *
+   * Đây là "đổi nguồn" theo nghĩa **ưu tiên**, không phải khoá cứng: nguồn được
+   * chọn chỉ được hỏi trước, và `detail()` vẫn giữ nguyên luật nguồn phát trước
+   * nguồn metadata — chọn TMDB không được phép làm mất khả năng bấm play.
+   */
+  prefer(name?: string | null): CatalogResolver {
+    const wanted = name?.trim().toLowerCase();
+    if (!wanted || wanted === 'auto') return this;
+    const cached = this.views.get(wanted);
+    if (cached) return cached;
+    const found = this.sources.find((source) => source.name === wanted);
+    if (!found) throw httpError(400, `Nguồn "${wanted}" không nằm trong các nguồn đang bật (${this.names.join(', ')})`);
+    const view = new CatalogResolver(
+      [found, ...this.sources.filter((source) => source !== found)],
+      { health: this.health, slugMap: this.slugMap }
+    );
+    this.views.set(wanted, view);
+    return view;
   }
 
   /** Nguồn phát được, theo thứ tự ưu tiên. */
@@ -189,12 +235,18 @@ export class CatalogResolver {
    * nên phim lấy từ nguồn nào phát được thì bản ghi thuộc nguồn đó; metadata chỉ
    * lấp chỗ trống. Không nguồn phát nào có thì mới trả về bản chỉ-metadata, đánh
    * dấu `playable: false` để phía trên biết đây là mục trong catalog chưa xem được.
+   *
+   * `onStage` để hàng đợi nhập phim (`importer.ts`) kể lại việc đang làm cho web.
+   * Hàm này gọi nó ngay trước mỗi lần hỏi một nguồn, nên chặng báo lên là chặng
+   * *đang* chờ chứ không phải chặng vừa xong — đúng cái người đang chờ muốn biết.
    */
-  async detail(slug: string): Promise<ResolvedDetail> {
+  async detail(slug: string, onStage?: StageReporter): Promise<ResolvedDetail> {
     const reasons: string[] = [];
+    const report: StageReporter = (stage, source) => { try { onStage?.(stage, source); } catch { /* báo tiến trình không được phép làm đổ việc nhập */ } };
     let base: { source: string; detail: SourceDetail } | null = null;
 
     for (const source of this.orderedFor('detail', this.playable)) {
+      report('playable', source.name);
       const found = await this.detailFrom(source, slug, null, reasons);
       if (found && episodeCount(found.episodes)) {
         base = { source: source.name, detail: found };
@@ -207,6 +259,7 @@ export class CatalogResolver {
 
     if (!base) {
       for (const source of this.orderedFor('detail', this.metadataSources)) {
+        report('metadata', source.name);
         const found = await this.detailFrom(source, slug, null, reasons);
         if (found) {
           base = { source: source.name, detail: found };
@@ -217,11 +270,27 @@ export class CatalogResolver {
 
     if (!base) throw httpError(404, `Không nguồn nào có phim "${slug}" (${reasons.join('; ') || 'không có nguồn hỗ trợ detail'})`);
 
+    // Đang đứng trên slug của một nguồn metadata (duyệt catalog TMDB/TVDB rồi bấm
+    // vào phim) nên vòng trên không nguồn phát nào hiểu slug này. Giờ đã có tên +
+    // năm, hỏi lại các nguồn phát bằng tên: tìm được thì phim này xem được, thay vì
+    // hiện một trang chi tiết đẹp mà không có nút play nào.
+    if (!episodeCount(base.detail.episodes)) {
+      for (const source of this.orderedFor('detail', this.playable)) {
+        if (source.name === base.source) continue;
+        report('rematch', source.name);
+        const found = await this.detailByMatch(source, slug, base.detail.movie, reasons);
+        if (!found || !episodeCount(found.episodes)) continue;
+        base = { source: source.name, detail: found };
+        break;
+      }
+    }
+
     let movie = base.detail.movie;
     const enrichedBy: string[] = [];
     for (const source of this.orderedFor('detail', this.sources)) {
       if (source.name === base.source) continue;
       if (isComplete(movie)) break;
+      report('enrich', source.name);
       const found = await this.detailFrom(source, slug, movie, reasons);
       if (!found) continue;
       const before = movie;
@@ -230,7 +299,10 @@ export class CatalogResolver {
     }
 
     return {
-      movie,
+      // Slug trả về luôn là slug đã được yêu cầu, dù bản ghi cuối cùng đến từ nguồn
+      // khác: DB định danh phim bằng `ON CONFLICT(slug)` và URL đang mở là slug này,
+      // nên đổi nó ở đây là ghi một bản ghi mà route vừa gọi không tìm lại được.
+      movie: movie.slug === slug ? movie : { ...movie, slug },
       episodes: base.detail.episodes,
       source: base.source,
       enrichedBy,
@@ -248,6 +320,18 @@ export class CatalogResolver {
     reference: MovieSummary | null,
     reasons: string[]
   ): Promise<SourceDetail | null> {
+    const direct = await this.detailDirect(source, slug, reasons);
+    if (direct) return direct;
+    if (!reference || typeof source.search !== 'function') {
+      // Không có gì để tìm lại: chỉ ghi nhận lỗi, không tính là nguồn chết vì
+      // "nguồn này không có phim đó" là câu trả lời hợp lệ.
+      return null;
+    }
+    return this.detailByMatch(source, slug, reference, reasons);
+  }
+
+  /** Thử đúng slug (hoặc slug đã ghi nhớ của nguồn này), không tìm kiếm lại. */
+  private async detailDirect(source: CatalogSource, slug: string, reasons: string[]): Promise<SourceDetail | null> {
     const mapped = this.slugMap.get(slug)?.[source.name];
     const attempts = mapped && mapped !== slug ? [mapped] : [slug];
     for (const candidate of attempts) {
@@ -260,15 +344,21 @@ export class CatalogResolver {
         reasons.push(`${source.name}: ${(error as Error)?.message ?? error}`);
       }
     }
-    if (!reference || typeof source.search !== 'function') {
-      // Không có gì để tìm lại: chỉ ghi nhận lỗi, không tính là nguồn chết vì
-      // "nguồn này không có phim đó" là câu trả lời hợp lệ.
-      return null;
-    }
+    return null;
+  }
+
+  /** Tìm phim ở nguồn khác bằng tên + năm, rồi lấy detail theo slug của nguồn đó. */
+  private async detailByMatch(
+    source: CatalogSource,
+    slug: string,
+    reference: MovieSummary,
+    reasons: string[]
+  ): Promise<SourceDetail | null> {
+    if (typeof source.detail !== 'function' || typeof source.search !== 'function') return null;
     const reconciled = await this.findSlug(source, reference, reasons);
     if (!reconciled) return null;
     try {
-      const detail = checkDetail(source.name, await source.detail!(reconciled));
+      const detail = checkDetail(source.name, await source.detail(reconciled));
       this.succeed(source.name);
       this.rememberSlug(slug, source.name, reconciled);
       return detail;

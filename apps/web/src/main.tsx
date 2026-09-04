@@ -4,6 +4,9 @@ import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 import { store } from './store';
 import App from './App';
+// Nạp trước cả React: module này sơn `data-theme` lên <html> ngay lúc chạy, nên trang
+// hiện đúng màu từ khung hình đầu tiên thay vì nháy tối rồi mới sáng.
+import './theme';
 import './styles.css';
 /**
  * Chỉ còn BrowserRouter. Trước đây có nhánh HashRouter cho bản .ipk đóng gói vì nó

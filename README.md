@@ -22,10 +22,13 @@ Sau khi deploy, máy tính cá nhân không cần bật liên tục. Vercel ph�
 ```text
 apps/web/                 Frontend React/Vite
 apps/web/public/tv/       Lớp điều khiển TV (D-pad, phím remote LG)
+apps/web/src/source.ts    Nguồn phim đang chọn + nguồn đã trả lời
+apps/web/src/theme.ts     Chế độ sáng/tối/theo máy
 services/api/             Backend Express
 services/api/src/db.ts    Kết nối PostgreSQL
 services/api/src/hls.ts   Bộ lọc quảng cáo trong playlist m3u8
 services/api/src/stream.ts Proxy playlist đã bóc quảng cáo cho player
+services/api/src/importer.ts Hàng đợi nhập phim chạy ở nền
 services/api/src/providers/ Tầng nguồn catalog (nhiều nguồn, có fallback)
 supabase/migrations/      Schema PostgreSQL
 BaoNhanCinema/            App TV LG (webOS) — nội dung file .ipk
@@ -34,7 +37,9 @@ railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
 
-Nguồn catalog là **một tầng nhiều nguồn có thứ tự ưu tiên** (`CATALOG_SOURCES`), không phải một nguồn duy nhất: nguồn đầu lỗi thì tự rơi xuống nguồn sau, và nguồn `metadata` (TMDB) bồi vào chỗ trống của nguồn `playable` (VSMOV). Chi tiết ở mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
+Nguồn catalog là **một tầng nhiều nguồn có thứ tự ưu tiên** (`CATALOG_SOURCES`), không phải một nguồn duy nhất: nguồn đầu lỗi thì tự rơi xuống nguồn sau, và các nguồn `metadata` (TMDB, TheTVDB) bồi vào chỗ trống của nguồn `playable` (VSMOV). Người xem đổi được nguồn ưu tiên ngay trên header, xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
+
+Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn việc kéo dữ liệu về chạy ở nền và có thanh tiến trình riêng — mục [12](#12-mở-một-phim-chưa-có-trong-db).
 
 App cho TV LG là **hosted web app**: file `.ipk` chỉ chứa `appinfo.json` + icon, còn nội dung lấy thẳng từ domain Vercel. Nghĩa là sửa web chỉ cần `git push`, không đóng gói lại. Hướng dẫn đầy đủ ở [docs/webos.md](docs/webos.md).
 
@@ -140,10 +145,12 @@ Trong Railway service, mở **Variables** và thêm từng biến:
 DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
-CATALOG_SOURCES=vsmov,tmdb
+CATALOG_SOURCES=vsmov,tmdb,tvdb
 VSMOV_API_URL=https://vsmov.com/api
 TMDB_ACCESS_TOKEN=token-v4-cua-themoviedb
 TMDB_LANGUAGE=vi-VN
+TVDB_API_KEY=khoa-cua-thetvdb
+TVDB_LANGUAGE=vie
 WEB_ORIGIN=http://localhost:5173
 HOST=0.0.0.0
 ```
@@ -155,10 +162,14 @@ Giải thích:
 | `DATABASE_URL` | Kết nối PostgreSQL Supabase |
 | `DATABASE_SSL` | Bật SSL khi kết nối Supabase |
 | `DATABASE_POOL_SIZE` | Số connection tối đa của một API instance |
-| `CATALOG_SOURCES` | Danh sách nguồn catalog, **thứ tự là ưu tiên** (`vsmov,tmdb`) |
+| `CATALOG_SOURCES` | Danh sách nguồn catalog, **thứ tự là ưu tiên** (`vsmov,tmdb,tvdb`) |
 | `VSMOV_API_URL` | Base URL của nguồn VSMOV |
 | `TMDB_ACCESS_TOKEN` | Token v4 của TMDB. Không có thì dùng `TMDB_API_KEY` (khoá v3); không có cả hai thì nguồn tmdb tự tắt |
 | `TMDB_LANGUAGE` | Ngôn ngữ metadata TMDB, mặc định `vi-VN` |
+| `TVDB_API_KEY` | Khoá TheTVDB v4. Không đặt thì nguồn tvdb tự tắt |
+| `TVDB_PIN` | Chỉ cần cho khoá loại "user-supported" của TheTVDB |
+| `TVDB_LANGUAGE` | Ngôn ngữ TVDB, mã ISO 639-2/B ba chữ, mặc định `vie` |
+| `TVDB_COUNTRIES` | Các nước mà trang danh sách TVDB gộp lại, mặc định `chn,kor,jpn` |
 | `WEB_ORIGIN` | Những frontend domain được phép gọi API bằng trình duyệt |
 | `HOST` | Cho phép Railway truy cập Express server |
 | `STREAM_SECRET` | Tuỳ chọn: khoá ký link playlist con của bộ lọc quảng cáo ([docs/ads.md](docs/ads.md)) |
@@ -346,11 +357,11 @@ HOST=0.0.0.0
 WEB_ORIGIN=http://localhost:5173
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=5
-CATALOG_SOURCES=vsmov,tmdb
+CATALOG_SOURCES=vsmov,tmdb,tvdb
 VSMOV_API_URL=https://vsmov.com/api
 ```
 
-Chạy local không có khoá TMDB vẫn được: nguồn tmdb tự tắt kèm một dòng cảnh báo ở console, phần còn lại của web chạy bình thường.
+Chạy local không có khoá TMDB/TVDB vẫn được: nguồn thiếu khoá tự tắt kèm một dòng cảnh báo ở console (`[catalog] bỏ qua nguồn tvdb: thiếu TVDB_API_KEY`), phần còn lại của web chạy bình thường. Nút **Nguồn phim** trên header hiện nguồn đó ở dạng mờ kèm lý do.
 
 `VITE_API_URL` không bắt buộc khi chạy local vì Vite proxy `/api` sang `http://localhost:4000`.
 
@@ -393,7 +404,7 @@ npm run lint
 npm run build
 ```
 
-`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8 và của tầng nguồn catalog trên dữ liệu tự dựng, không cần mạng hay database.
+`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8, của tầng nguồn catalog (resolver, TMDB, TheTVDB) và của hàng đợi nhập phim — tất cả trên dữ liệu tự dựng, không cần mạng, khoá API hay database. Adapter nào cần khoá thì test tự đặt khoá giả và thay `globalThis.fetch`, nên CI không có bí mật nào vẫn chạy đủ.
 
 `npm run lint` dùng ESLint 9 với cấu hình ở [eslint.config.mjs](eslint.config.mjs) — một file cho cả hai workspace. Cảnh báo (`warn`) không làm lệnh thất bại, chỉ lỗi (`error`) mới. `npm run lint:fix` sửa những gì sửa được tự động.
 
@@ -422,6 +433,7 @@ http.ts       fetch dùng chung: timeout, cache theo TTL
 resolver.ts   Chọn nguồn, fallback, circuit breaker, bồi metadata
 vsmov.ts      Nguồn playable (có link tập)
 tmdb.ts       Nguồn metadata (không có link tập)
+tvdb.ts       Nguồn metadata thứ hai (TheTVDB v4, mạnh về phim bộ châu Á)
 index.ts      Đăng ký nguồn, đọc CATALOG_SOURCES
 ```
 
@@ -430,7 +442,9 @@ Hai loại nguồn khác nhau ở chỗ được phép trả gì:
 | Loại | Ví dụ | Được dùng cho |
 | --- | --- | --- |
 | `playable` | vsmov | Danh sách, tìm kiếm, **và link tập** |
-| `metadata` | tmdb | Chỉ lấp chỗ trống: poster, mô tả, năm, điểm, diễn viên |
+| `metadata` | tmdb, tvdb | Chỉ lấp chỗ trống: poster, mô tả, năm, điểm, diễn viên |
+
+MyDramaList (`mdl`) có tên trong bảng nguồn nhưng chưa có adapter — API của họ chưa mở công khai. Nó hiện mờ trong danh sách nguồn kèm lý do thay vì bị giấu đi, vì một danh sách thiếu tên trông như lỗi.
 
 Mọi method trong `CatalogSource` đều **optional**. Resolver hỏi `typeof source.byGenre === 'function'` trước khi gọi, nên một nguồn chỉ có `search` vẫn đăng ký được — nó chỉ đơn giản là bị bỏ qua ở những khả năng nó không có.
 
@@ -462,17 +476,20 @@ export const mySource: CatalogSource = {
 Đăng ký trong `providers/index.ts`:
 
 ```ts
-const AVAILABLE = {
-  vsmov: { source: vsmov, enabled: true, hint: '' },
-  tmdb: { source: tmdb, enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' },
-  mysource: { source: mySource, enabled: Boolean(process.env.MYSOURCE_API_URL), hint: 'thiếu MYSOURCE_API_URL' }
+const AVAILABLE: Record<string, Entry> = {
+  vsmov: { source: vsmov, kind: 'playable', enabled: true, hint: '' },
+  tmdb: { source: tmdb, kind: 'metadata', enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' },
+  tvdb: { source: tvdb, kind: 'metadata', enabled: tvdbEnabled, hint: 'thiếu TVDB_API_KEY' },
+  mysource: { source: mySource, kind: 'playable', enabled: Boolean(process.env.MYSOURCE_API_URL), hint: 'thiếu MYSOURCE_API_URL' }
 };
 ```
+
+`enabled: false` không xoá tên nguồn khỏi `GET /api/providers` — nó vào danh sách `inactive` kèm `hint`, và web hiện mờ kèm lý do. Nguồn đã đặt tên nhưng chưa có adapter thì để `source: null` (đó là chỗ của `mdl`).
 
 Rồi đổi biến môi trường trên Railway:
 
 ```env
-CATALOG_SOURCES=mysource,vsmov,tmdb
+CATALOG_SOURCES=mysource,vsmov,tmdb,tvdb
 ```
 
 Tên nguồn không có trong `AVAILABLE` sẽ làm API dừng ngay lúc khởi động — sai chính tả biến môi trường phải vỡ ồn ào, không im lặng chạy thiếu nguồn.
@@ -488,15 +505,78 @@ GET /api/providers
 ```json
 {
   "sources": [
-    { "name": "vsmov", "kind": "playable", "healthy": true, "failures": 0, "openUntil": null, "lastError": null },
-    { "name": "tmdb", "kind": "metadata", "healthy": false, "failures": 3, "openUntil": "2026-09-04T10:31:00.000Z", "lastError": "Nguồn tmdb trả HTTP 401 (kiểm tra khoá API trong biến môi trường)" }
-  ]
+    { "name": "vsmov", "kind": "playable", "capabilities": ["home", "search", "detail"], "healthy": true, "failures": 0, "openUntil": null, "lastError": null, "lastSuccessAt": "2026-09-04T10:29:58.000Z" },
+    { "name": "tvdb", "kind": "metadata", "capabilities": ["home", "search", "detail"], "healthy": false, "failures": 3, "openUntil": "2026-09-04T10:31:00.000Z", "lastError": "Nguồn tvdb trả HTTP 401 (kiểm tra khoá API trong biến môi trường)", "lastSuccessAt": null }
+  ],
+  "inactive": [
+    { "name": "mdl", "kind": "metadata", "hint": "MyDramaList chưa mở API công khai — cần xin khoá ở mydramalist.com/api_request" }
+  ],
+  "order": ["vsmov", "tmdb", "tvdb"]
 }
 ```
 
 `healthy: false` nghĩa là đang bị tạm ngừng, không phải nguồn đã chết hẳn; `openUntil` là lúc nó được thử lại.
 
-## 12. Xử lý lỗi thường gặp
+`inactive` là những nguồn có tên nhưng chưa dùng được (thiếu khoá, chưa có adapter), kèm `hint` nói thiếu gì.
+
+### 11.4. Đổi nguồn ưu tiên cho một request
+
+`CATALOG_SOURCES` là thứ tự mặc định của server. Từng request đổi được thứ tự đó:
+
+```text
+GET /api/catalog/home?source=tvdb
+GET /api/catalog/search?q=dien%20hy&source=tmdb
+```
+
+hoặc bằng header `x-catalog-source: tvdb` cho script và curl.
+
+Đây là **ưu tiên, không phải khoá cứng**: nguồn được chọn chỉ nhảy lên đầu hàng, mọi bước fallback ở 11.1 vẫn nguyên. Ba tính chất đi kèm, mỗi cái đổi lấy một lỗi đã gặp:
+
+- Trong `detail()`, nguồn `playable` vẫn được hỏi trước nguồn `metadata` kể cả khi đang chọn một nguồn metadata. Không có luật này thì chọn `tmdb` là tự tay tắt nút play, vì nguồn metadata không có link tập.
+- Tên nguồn không nằm trong danh sách đang bật thì trả `400` và kể tên các nguồn đang bật, không im lặng bỏ qua. Sai chính tả một lần rồi ngồi hỏi vì sao đổi nguồn không có tác dụng thì tốn thời gian hơn nhiều.
+- Mọi response catalog đều mang thêm `source` — **nguồn đã thật sự trả lời**, không phải nguồn được chọn:
+
+```json
+{ "items": [], "pagination": {}, "source": "vsmov" }
+```
+
+Trên web, nút **Nguồn phim** ở header làm đúng việc này (`apps/web/src/source.ts`): lựa chọn được nhớ trong `localStorage`, gắn vào mọi request catalog, và nút hiện luôn nguồn đang trả lời. Chọn `tvdb` rồi mở trang chủ vẫn thấy `vsmov` trả lời là chuyện bình thường — TVDB không có mục "phim mới cập nhật" — nên nút chấm màu hổ phách để nói ra chuyện đó thay vì để người dùng tin là mình đang xem dữ liệu TVDB.
+
+Đổi nguồn ở web sẽ xoá sạch cache của RTK Query. Khoá cache được tính từ tham số endpoint **trước khi** `?source=` được gắn vào, nên không xoá thì đổi nguồn xong vẫn thấy y nguyên dữ liệu cũ.
+
+## 12. Mở một phim chưa có trong DB
+
+Trước đây `GET /api/catalog/movies/:slug` gọi thẳng `resolver.detail()` rồi mới trả lời. Phim chưa từng xem thì request đó phải đi qua nhiều nguồn ngoài, mỗi nguồn tới 20 giây timeout — người dùng bấm vào poster và ngồi nhìn một vòng xoay, không biết web còn sống hay không. Sai ở **thứ tự ưu tiên**, không phải ở tốc độ: mở được trang chi tiết là việc gấp, kéo đủ metadata thì không.
+
+Nên route trả lời ngay bằng những gì đã có, và mở một job nhập ở nền ([services/api/src/importer.ts](services/api/src/importer.ts)):
+
+| Tình huống | Mã | Body |
+| --- | --- | --- |
+| Đã có trong DB | `200` | `{ "movie": { ... } }` |
+| Chưa có, job đang chạy | `202` | `{ "movie": null, "importing": { "slug": "...", "stage": "metadata", "source": "tmdb", "elapsedMs": 1840, "error": null } }` |
+| Chưa có, job vừa đổ | `502` | `{ "message": "Nguồn vsmov trả HTTP 502" }` |
+
+`202` là **thành công**, không phải lỗi: web vẽ trang chi tiết từ dữ liệu của thẻ phim vừa bấm rồi hiện tiến trình thật của job.
+
+```text
+GET /api/import/:slug/status   -> { "slug": "...", "importing": ImportJob | null }
+POST /api/import/:slug         -> nhập rồi chờ, trả { "movie": ... } (script nhập tay)
+GET /api/catalog/movies/:slug?wait=1
+```
+
+`?wait=1` giữ lại hành vi chặn cũ cho curl và những client không biết poll; job đổ thì nó ném lại đúng lỗi gốc (404 phim không tồn tại khác 502 nguồn chết).
+
+`stage` đi qua `queued → playable → metadata → rematch → enrich → saving → ready`. Bốn chặng giữa là các bước thật của resolver, nên thanh tiến trình nói được việc đang làm chứ không phải một con số bịa cho đẹp.
+
+Ba tính chất của hàng đợi, mỗi cái đổi lấy một lỗi đã gặp:
+
+- **Gộp theo slug.** Mười tab cùng mở một phim vẫn là một job. Không có nó, việc poll 1.5 giây/lần sẽ tự nhân bản job cho tới khi nguồn ngoài chặn IP.
+- **Trần số job chạy song song** (`MAX_RUNNING = 6`). Job vượt trần nằm ở chặng `queued`. Đây là chỗ duy nhất chặn được việc mở 50 phim liền tay biến thành 50 chuỗi request tới nguồn ngoài.
+- **Không giữ rác.** Job đã xong nằm lại 30 giây cho client kịp đọc kết quả rồi bị dọn; job đã đổ bị bỏ ngay khi client đọc, để lần bấm "Thử lại" là một lần nhập thật chứ không phải phát lại lỗi cũ.
+
+Hàng đợi nằm trong RAM của một tiến trình, nên chạy nhiều instance thì mỗi instance có hàng đợi riêng. Chấp nhận được: job chỉ là *tiến trình* của một lần nhập, còn kết quả nằm ở DB dùng chung. Số job hiện tại có trong `GET /api/health` (`imports`).
+
+## 13. Xử lý lỗi thường gặp
 
 ### Railway báo `DATABASE_URL is required`
 
@@ -541,7 +621,19 @@ Trang chủ lấy catalog trực tiếp từ provider. Các trang **Kho local**,
 
 Nguồn `m3u8` có thể chặn CORS hoặc hết hạn. Player sẽ tự fallback sang `embedUrl`; lỗi này độc lập với Vercel, Railway và Supabase.
 
-## 13. Thứ tự triển khai ngắn gọn
+### Đổi nguồn trên header mà dữ liệu vẫn như cũ
+
+Xem nút **Nguồn phim** đang hiện nguồn nào *đang trả lời*. Nguồn được chọn chỉ được hỏi trước; nguồn không có khả năng đang cần (TVDB không có "phim mới cập nhật") hoặc đang bị circuit breaker tạm ngừng thì nguồn khác trả lời, và nút hiện một chấm màu hổ phách để nói ra chuyện đó. Đối chiếu `GET /api/providers` — `healthy: false` kèm `lastError` là lý do thật.
+
+### Nguồn hiện mờ trong danh sách
+
+Nguồn thiếu khoá (`thiếu TVDB_API_KEY`) hoặc chưa có adapter (`mdl`). Thêm khoá vào biến môi trường Railway rồi redeploy API; danh sách nguồn được đọc lúc khởi động.
+
+### Thanh "tải phim" đứng mãi ở `queued`
+
+Đang có 6 job khác chạy (`MAX_RUNNING`), hoặc nguồn ngoài đang treo tới hết 20 giây timeout. `GET /api/health` cho biết số job đang chạy và đang chờ; `GET /api/import/:slug/status` cho biết chặng của đúng phim đó. Job đổ thì thanh tiến trình chuyển sang trạng thái lỗi kèm lý do của nguồn, và lần bấm "Thử lại" mở một job mới.
+
+## 14. Thứ tự triển khai ngắn gọn
 
 Nếu đã hiểu các bước trên, checklist tối thiểu là:
 

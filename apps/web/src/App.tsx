@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { RouteFallback } from './ui';
+import { RouteFallback, TopProgress } from './ui';
 
 /**
  * Mỗi trang là một chunk riêng: mở trang chủ không phải tải kèm trình phát,
@@ -19,19 +19,25 @@ const Showtimes = lazy(() => import('./pages/Showtimes'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 export default function App() {
-  return <Suspense fallback={<RouteFallback />}>
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/browse/:kind/:value" element={<Browse />} />
-      <Route path="/search" element={<SearchPage />} />
-      <Route path="/movie/:slug" element={<Detail />} />
-      <Route path="/watch/:slug/:episodeId" element={<Watch />} />
-      <Route path="/library" element={<Library />} />
-      <Route path="/local" element={<Local />} />
-      <Route path="/people" element={<People />} />
-      <Route path="/person/:slug" element={<Person />} />
-      <Route path="/showtimes" element={<Showtimes />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </Suspense>;
+  return <>
+    {/* Vạch tiến trình mảnh trên đỉnh trang. Đặt ngoài `Suspense` để lúc chunk của
+        trang mới đang về nó vẫn còn sống — nằm trong thì fallback tháo nó ra đúng
+        lúc cần nhất. */}
+    <TopProgress />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/browse/:kind/:value" element={<Browse />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/movie/:slug" element={<Detail />} />
+        <Route path="/watch/:slug/:episodeId" element={<Watch />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/local" element={<Local />} />
+        <Route path="/people" element={<People />} />
+        <Route path="/person/:slug" element={<Person />} />
+        <Route path="/showtimes" element={<Showtimes />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  </>;
 }

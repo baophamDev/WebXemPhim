@@ -28,6 +28,14 @@ export interface CatalogFilters {
 /** `playable` phát được phim; `metadata` chỉ mô tả phim. */
 export type SourceKind = 'playable' | 'metadata';
 
+/**
+ * Các chặng có thật bên trong `resolver.detail()`, theo đúng thứ tự nó chạy:
+ * hỏi nguồn phát bằng slug → hỏi nguồn metadata → tìm lại nguồn phát bằng tên +
+ * năm → bồi nốt các field còn trống. Hàng đợi nhập phim báo những tên này lên web
+ * để bảng tiến trình nói được việc đang làm, thay vì một con số phần trăm bịa.
+ */
+export type DetailStage = 'playable' | 'metadata' | 'rematch' | 'enrich';
+
 export type Capability =
   | 'latest' | 'home' | 'list' | 'search' | 'genres' | 'byGenre' | 'countries'
   | 'byCountry' | 'years' | 'byYear' | 'actors' | 'codes' | 'byCode' | 'detail';
@@ -141,4 +149,17 @@ export interface SourceHealth {
   openUntil: string | null;
   lastError: string | null;
   lastSuccessAt: string | null;
+}
+
+/**
+ * Nguồn có tên trong hệ thống nhưng đang không dùng được: chưa có khoá API, hoặc
+ * chưa viết adapter (MyDramaList). Trả về cho web để hiện mờ kèm lý do, thay vì
+ * giấu đi — người dùng thấy "MyDramaList (chưa có API key)" thì hiểu ngay, còn
+ * một danh sách ba nguồn mà chỉ hiện hai thì trông như lỗi.
+ */
+export interface InactiveSource {
+  name: string;
+  kind: SourceKind;
+  /** Lý do nguồn chưa bật, viết cho người đọc chứ không phải mã lỗi. */
+  hint: string;
 }

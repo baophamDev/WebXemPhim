@@ -5,6 +5,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { Clapperboard, Compass, Film, Library, Menu, Search, Users, X } from 'lucide-react';
+// Import thẳng từ './pickers', không qua barrel './index': Shell nằm trong barrel đó
+// nên đi đường vòng là tạo phụ thuộc quay đầu giữa hai module.
+import { SourcePicker, ThemePicker } from './pickers';
 
 const scrollPositions = new Map<string, number>();
 
@@ -63,6 +66,8 @@ function Header() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tên phim hoặc diễn viên" aria-label="Tìm phim hoặc diễn viên" />
       </form>
       <Link className="icon-button mobile-search" to="/search" aria-label="Tìm kiếm"><Search /></Link>
+      <SourcePicker />
+      <ThemePicker />
       <Link className="icon-button desktop-icon" to="/library" aria-label="Thư viện của tôi"><Library /></Link>
       <button className="icon-button menu-button" onClick={() => setMenuOpen(true)} aria-label="Mở menu" aria-expanded={menuOpen}><Menu /></button>
     </div>

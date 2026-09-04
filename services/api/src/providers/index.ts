@@ -15,18 +15,38 @@
  * API không khởi động được vì thiếu một nguồn bồi metadata. Nhưng bật đúng tên mà
  * nguồn không tồn tại thì vẫn ném — đó là lỗi chính tả trong cấu hình, im lặng
  * chỉ khiến người ta đi tìm ở chỗ khác.
+ *
+ * `mdl` (MyDramaList) có tên trong bảng nhưng `source: null`: chưa có API công
+ * khai nên chưa viết adapter. Khai báo sẵn để `/api/providers` nói được "có nguồn
+ * này, đang thiếu khoá" và web hiện nó mờ — thêm sau chỉ là điền `source`.
  */
 import { CatalogResolver } from './resolver.js';
 import { tmdb, tmdbEnabled } from './tmdb.js';
-import type { CatalogSource } from './types.js';
+import { tvdb, tvdbEnabled } from './tvdb.js';
+import type { CatalogSource, InactiveSource, SourceKind } from './types.js';
 import { vsmov } from './vsmov.js';
 
-const AVAILABLE: Record<string, { source: CatalogSource; enabled: boolean; hint: string }> = {
-  vsmov: { source: vsmov, enabled: true, hint: '' },
-  tmdb: { source: tmdb, enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' }
+interface Entry {
+  /** null = đã đặt tên nhưng chưa có adapter. */
+  source: CatalogSource | null;
+  kind: SourceKind;
+  enabled: boolean;
+  hint: string;
+}
+
+const AVAILABLE: Record<string, Entry> = {
+  vsmov: { source: vsmov, kind: 'playable', enabled: true, hint: '' },
+  tmdb: { source: tmdb, kind: 'metadata', enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' },
+  tvdb: { source: tvdb, kind: 'metadata', enabled: tvdbEnabled, hint: 'thiếu TVDB_API_KEY' },
+  mdl: {
+    source: null,
+    kind: 'metadata',
+    enabled: false,
+    hint: 'MyDramaList chưa mở API công khai — cần xin khoá ở mydramalist.com/api_request'
+  }
 };
 
-const DEFAULT_ORDER = 'vsmov,tmdb';
+const DEFAULT_ORDER = 'vsmov,tmdb,tvdb';
 
 function requested(): string[] {
   const raw = process.env.CATALOG_SOURCES ?? process.env.CATALOG_PROVIDER ?? DEFAULT_ORDER;
@@ -39,7 +59,7 @@ function build(): CatalogSource[] {
   for (const name of requested()) {
     const entry = AVAILABLE[name];
     if (!entry) throw new Error(`Nguồn catalog không tồn tại: "${name}" (có: ${Object.keys(AVAILABLE).join(', ')})`);
-    if (!entry.enabled) {
+    if (!entry.enabled || !entry.source) {
       console.warn(`[catalog] bỏ qua nguồn ${name}: ${entry.hint}`);
       continue;
     }
@@ -56,7 +76,25 @@ function build(): CatalogSource[] {
 
 export const catalog = new CatalogResolver(build());
 
+/**
+ * Nguồn có tên nhưng không nằm trong resolver — kèm lý do. Web dùng danh sách này
+ * để hiện mục mờ trong bộ chọn nguồn: biết nguồn tồn tại và biết thiếu gì thì hơn
+ * là không thấy gì cả.
+ */
+export function inactiveSources(): InactiveSource[] {
+  const active = new Set(catalog.names);
+  return Object.entries(AVAILABLE)
+    .filter(([name]) => !active.has(name))
+    .map(([name, entry]) => ({
+      name,
+      kind: entry.kind,
+      hint: entry.hint || (entry.source ? 'chưa bật trong CATALOG_SOURCES' : 'chưa có adapter')
+    }));
+}
+
 console.log(`[catalog] nguồn đang bật (theo ưu tiên): ${catalog.names.join(' → ')}`);
 
-export type { CatalogFilters, CatalogSource, ListPage, MovieSummary, SourceDetail, SourceHealth, Taxonomy } from './types.js';
+export type {
+  CatalogFilters, CatalogSource, InactiveSource, ListPage, MovieSummary, SourceDetail, SourceHealth, Taxonomy
+} from './types.js';
 export type { ResolvedDetail } from './resolver.js';
