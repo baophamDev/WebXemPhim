@@ -1,44 +1,73 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react';
-import { useGetMovieQuery, useSaveProgressMutation } from '../api';
+import { apiBaseUrl, useGetMovieQuery, useSaveProgressMutation } from '../api';
 import type { Episode } from '../types';
 import { ErrorState } from '../ui';
 
+/**
+ * Thang nguồn, tụt dần một bậc mỗi khi bậc đang dùng chết:
+ *   clean  — playlist đã bóc quảng cáo do API dựng lại (xem docs/ads.md)
+ *   direct — m3u8 gốc: còn quảng cáo, nhưng vẫn xem được khi API hỏng
+ *   embed  — trang nhúng của nguồn, bậc cuối vì bên trong mình không kiểm soát gì
+ * Lọc quảng cáo không được phép làm giảm độ tin cậy, nên phải có đường lùi.
+ */
+type Stage = 'clean' | 'direct' | 'embed';
+
 function VideoPlayer({ episode, title }: { episode: Episode; title: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [fallback, setFallback] = useState(!episode.m3u8Url);
-  useEffect(() => setFallback(!episode.m3u8Url), [episode.id, episode.m3u8Url]);
+  const firstStage: Stage = episode.m3u8Url ? 'clean' : 'embed';
+  const [stage, setStage] = useState<Stage>(firstStage);
+  useEffect(() => setStage(firstStage), [episode.id, firstStage]);
+  const degrade = useCallback(() => setStage((current) => (current === 'clean' ? 'direct' : 'embed')), []);
+  const source = stage === 'clean' ? `${apiBaseUrl}/stream/episode/${episode.id}/playlist.m3u8`
+    : stage === 'direct' ? episode.m3u8Url : null;
+
   useEffect(() => {
-    if (fallback) return;
     const video = videoRef.current;
-    if (!video || !episode.m3u8Url) return;
+    if (!video || !source) return;
     // Phụ đề của nguồn hay lẫn thẻ <i> dạng chuỗi, dọn định kỳ cho đỡ rối.
     const cleanCues = () => Array.from(video.textTracks).forEach((track) => Array.from(track.cues ?? []).forEach((cue) => {
       if ('text' in cue) cue.text = String(cue.text).replace(/&lt;\/?i&gt;/gi, '').replace(/<\/?i>/gi, '');
     }));
     const interval = window.setInterval(cleanCues, 1000);
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = episode.m3u8Url;
-      return () => { window.clearInterval(interval); video.removeAttribute('src'); video.load(); };
+      // Player gốc (Safari/iOS, một số TV) không cho chèn gì vào giữa — chỉ biết
+      // nó chết qua sự kiện error rồi tụt bậc.
+      video.src = source;
+      video.addEventListener('error', degrade);
+      return () => {
+        window.clearInterval(interval);
+        video.removeEventListener('error', degrade);
+        video.removeAttribute('src'); video.load();
+      };
     }
     let disposed = false;
     let destroy = () => {};
     // hls.js chỉ tải khi thật sự cần phát HLS — nó nặng hơn cả phần còn lại của trang.
     void import('hls.js').then(({ default: Hls }) => {
       if (disposed) return;
-      if (!Hls.isSupported()) { setFallback(true); return; }
+      if (!Hls.isSupported()) { setStage('embed'); return; }
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       destroy = () => hls.destroy();
-      hls.loadSource(episode.m3u8Url!);
+      hls.loadSource(source);
       hls.attachMedia(video);
-      hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) setFallback(true); });
+      hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) degrade(); });
     });
     return () => { disposed = true; window.clearInterval(interval); destroy(); };
-  }, [episode.id, episode.m3u8Url, fallback]);
+  }, [episode.id, source, degrade]);
 
-  if (fallback) {
-    return <iframe src={episode.embedUrl} title={title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />;
+  if (!source) {
+    // sandbox cố tình thiếu allow-popups và allow-top-navigation: trang nhúng
+    // không mở nổi tab quảng cáo hay cướp điều hướng, phần phát phim vẫn chạy.
+    return <iframe
+      src={episode.embedUrl}
+      title={title}
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
+      allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+      allowFullScreen
+      referrerPolicy="no-referrer"
+    />;
   }
   return <video ref={videoRef} controls autoPlay playsInline title={title} />;
 }

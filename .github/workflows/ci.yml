@@ -35,6 +35,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Bộ lọc quảng cáo m3u8 chạy trên playlist tự dựng, không cần mạng hay DB
+      - name: Test
+        run: npm test
+
       # Build cả services/api (tsc) và apps/web (tsc -b + vite build)
       - name: Build
         run: npm run build

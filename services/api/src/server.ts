@@ -8,6 +8,7 @@ import {
   saveProgress, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
 } from './db.js';
 import { catalogProvider, type CatalogFilters } from './providers/index.js';
+import { streamRouter } from './stream.js';
 import { slugifyName } from './text.js';
 import { syncLatest } from './sync.js';
 
@@ -17,11 +18,21 @@ const app = express();
  * luôn mọi domain `*.vercel.app` (bản production và các preview deployment sinh
  * URL mới mỗi lần push) — nếu không, web trên Vercel bị CORS chặn và giao diện
  * hiện "API ngoại tuyến" dù API vẫn sống.
+ *
+ * App trên TV LG là hosted web app (appinfo.json trỏ `main` vào URL Vercel) nên nó
+ * đi qua đúng nhánh `*.vercel.app` ở trên. Nhánh `origin === 'null'` giữ lại cho
+ * đường lùi packaged — bản đó nạp index.html bằng file://, origin là opaque nên
+ * trình duyệt gửi đúng chuỗi `Origin: null` và không cho qua thì TV hiện "API
+ * ngoại tuyến". Nhánh `!origin` ngay dưới đã nhận mọi client không phải trình
+ * duyệt (curl, app native...) nên thêm 'null' không nới thêm quyền gì đáng kể;
+ * vẫn để cờ `ALLOW_NULL_ORIGIN=false` cho ai muốn tắt.
  */
 const allowedOrigins = (process.env.WEB_ORIGIN ?? 'http://localhost:5173').split(',').map((origin) => origin.trim()).filter(Boolean);
 const allowVercelPreview = process.env.ALLOW_VERCEL_PREVIEW !== 'false';
+const allowNullOrigin = process.env.ALLOW_NULL_ORIGIN !== 'false';
 function isAllowedOrigin(origin: string) {
   if (allowedOrigins.includes(origin)) return true;
+  if (origin === 'null') return allowNullOrigin;
   if (!allowVercelPreview) return false;
   try { return new URL(origin).hostname.endsWith('.vercel.app'); } catch { return false; }
 }
@@ -218,9 +229,13 @@ app.post('/api/import/:slug', asyncRoute(async (req, res) => res.json({ movie: a
 app.get('/api/provider/search', asyncRoute(async (req, res) => res.json(await catalogProvider.search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
 app.get('/api/vsmov/search', asyncRoute(async (req, res) => res.json(await catalogProvider.search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
 
+// Playlist HLS đã bóc quảng cáo của nguồn — xem docs/ads.md.
+app.use('/api/stream', streamRouter);
+
 app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const upstream = error?.name === 'AbortError' || String(error?.message).includes('HTTP');
-  res.status(upstream ? 502 : 400).json({ message: error?.issues?.[0]?.message ?? error?.message ?? 'Yêu cầu không hợp lệ' });
+  const status = Number.isInteger(error?.status) ? error.status : (upstream ? 502 : 400);
+  res.status(status).json({ message: error?.issues?.[0]?.message ?? error?.message ?? 'Yêu cầu không hợp lệ' });
 });
 
 const port = Number(process.env.PORT ?? 4000); const host = process.env.HOST ?? '0.0.0.0';

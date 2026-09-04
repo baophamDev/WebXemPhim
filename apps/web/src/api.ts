@@ -24,6 +24,8 @@ function readDeviceId(){
 }
 export const deviceId=readDeviceId();
 const apiBaseUrl=(import.meta.env.VITE_API_URL??'/api').replace(/\/$/,'');
+/** Player cần tự dựng URL playlist (/stream/...) chứ không đi qua RTK Query. */
+export {apiBaseUrl};
 
 /**
  * Base URL tương đối ('/api') chỉ chạy được khi có proxy cùng origin: dev server

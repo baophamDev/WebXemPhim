@@ -24,6 +24,8 @@ apps/web/                 Frontend React/Vite
 apps/web/public/tv/       Lớp điều khiển TV (D-pad, phím remote LG)
 services/api/             Backend Express
 services/api/src/db.ts    Kết nối PostgreSQL
+services/api/src/hls.ts   Bộ lọc quảng cáo trong playlist m3u8
+services/api/src/stream.ts Proxy playlist đã bóc quảng cáo cho player
 services/api/src/providers/ Lớp thay thế nguồn catalog
 supabase/migrations/      Schema PostgreSQL
 BaoNhanCinema/            App TV LG (webOS) — nội dung file .ipk
@@ -35,6 +37,8 @@ vercel.json               Cấu hình deploy Vercel
 Nguồn catalog mặc định là VSMOV. Database dùng hai trường `provider` và `provider_id`, vì vậy có thể thêm nguồn khác mà không cần đổi schema.
 
 App cho TV LG là **hosted web app**: file `.ipk` chỉ chứa `appinfo.json` + icon, còn nội dung lấy thẳng từ domain Vercel. Nghĩa là sửa web chỉ cần `git push`, không đóng gói lại. Hướng dẫn đầy đủ ở [docs/webos.md](docs/webos.md).
+
+Playlist của nguồn có quảng cáo chèn sẵn; API dựng lại playlist đã bóc quảng cáo trước khi giao cho player, chi tiết ở [docs/ads.md](docs/ads.md).
 
 ## 2. Những thứ cần chuẩn bị
 
@@ -153,6 +157,7 @@ Giải thích:
 | `VSMOV_API_URL` | Base URL của provider VSMOV |
 | `WEB_ORIGIN` | Những frontend domain được phép gọi API bằng trình duyệt |
 | `HOST` | Cho phép Railway truy cập Express server |
+| `STREAM_SECRET` | Tuỳ chọn: khoá ký link playlist con của bộ lọc quảng cáo ([docs/ads.md](docs/ads.md)) |
 
 Không tự tạo biến `PORT`. Railway tự cung cấp `PORT` cho ứng dụng.
 
@@ -374,9 +379,10 @@ Chạy tại thư mục gốc:
 ```powershell
 npm run typecheck
 npm run build
+npm test
 ```
 
-Cả hai lệnh phải kết thúc với exit code `0`.
+Cả ba lệnh phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8 trên playlist tự dựng, không cần mạng hay database.
 
 ## 10. Dữ liệu và bảo mật
 
