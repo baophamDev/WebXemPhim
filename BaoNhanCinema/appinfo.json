@@ -1,0 +1,15 @@
+{
+  "id": "com.localcinema.tv",
+  "version": "1.0.0",
+  "vendor": "BaoNhanCinema",
+  "type": "web",
+  "main": "https://bao-nhan-cinema.vercel.app/",
+  "title": "BảoNhànCinema",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0b0806",
+  "iconColor": "#ffc53d",
+  "resolution": "1920x1080",
+  "supportPortraitMode": false,
+  "disableBackHistoryAPI": true
+}

@@ -1,0 +1,11 @@
+# Dòng khớp sau ghi đè dòng khớp trước, nên quy tắc chung đứng trên, ngoại lệ ở dưới.
+* text=auto eol=lf
+
+# Script batch phải là CRLF. cmd.exe đọc file theo byte và với file chỉ có LF thì
+# `goto`/nhãn và dòng nối bằng `^` có thể chạy sai một cách im lặng.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+*.ipk binary
+*.png binary
+*.zip binary

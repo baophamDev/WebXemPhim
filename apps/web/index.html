@@ -16,5 +16,58 @@
       href="https://fonts.googleapis.com/css2?family=Anton&family=Chakra+Petch:wght@600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600&display=swap"
     />
   </head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!--
+      Lớp điều khiển TV (D-pad + phím riêng của điều khiển LG). Ba quyết định ở
+      đây đều có lý do, đổi là hỏng:
+
+      - Nạp từ trang chứ không chèn lúc đóng gói: app trên TV LG là "hosted web
+        app", appinfo.json trỏ `main` vào đúng URL này nên không còn bước đóng gói
+        nào để chèn script vào — trang phải tự nạp lấy.
+      - Đặt ở CUỐI <body>: lúc này <head> đã parse xong nên link CSS thêm vào head
+        nằm sau file CSS của app và đè được. Để trong <head> thì tv.css chèn trước
+        CSS của Vite, mọi override focus mất tác dụng mà không có lỗi nào.
+      - Chỉ nạp khi đúng là TV: máy tính và điện thoại không tải thêm byte nào.
+
+      Thử trên máy tính: thêm ?tv=1 vào URL rồi bấm mũi tên (focus sẽ nhảy ô).
+    -->
+    <script>
+      (function () {
+        var ua = navigator.userAgent || '';
+        // Web0S (chữ số 0, không phải chữ O) là UA của LG từ webOS 3 trở lên;
+        // NetCast là dòng TV LG trước 2014. window.PalmSystem là object webOS bơm
+        // vào mọi app đã cài nên vẫn nhận ra được khi UA bị đổi.
+        var onTv = /Web0S|webOS|NetCast|SmartTV|SMART-TV|HbbTV/i.test(ua)
+          || !!window.PalmSystem
+          || /(^|[?&])tv=1(&|$)/.test(location.search);
+        if (!onTv) return;
+
+        // Dấu hiệu để biết nhánh này đã chạy — trên TV không mở DevTools dễ như
+        // trên máy tính, có cái nhìn được bằng ares-inspect thì đỡ đoán.
+        document.documentElement.setAttribute('data-tv', '');
+
+        var styles = ['tv.css', 'webos.css'];
+        for (var i = 0; i < styles.length; i++) {
+          var link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = '/tv/' + styles[i];
+          document.head.appendChild(link);
+        }
+
+        // async = false là phần bắt buộc: script chèn bằng JS mặc định chạy ngay
+        // khi tải xong (không theo thứ tự), mà webos-keys.js cần window.__tv do
+        // tv-remote.js tạo ra. Cờ này buộc chúng chạy đúng thứ tự chèn.
+        var scripts = ['tv-remote.js', 'webos-keys.js'];
+        for (var k = 0; k < scripts.length; k++) {
+          var script = document.createElement('script');
+          script.src = '/tv/' + scripts[k];
+          script.async = false;
+          document.head.appendChild(script);
+        }
+      })();
+    </script>
+  </body>
 </html>

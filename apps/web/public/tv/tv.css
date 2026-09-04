@@ -1,0 +1,68 @@
+/*
+ * Lớp giao diện chỉ dành cho TV. Được nạp bằng loader ở cuối index.html và chỉ
+ * khi đang thật sự chạy trên TV, luôn sau styles.css của web nên chỉ cần đè lại
+ * vài chỗ (thứ tự đó là bắt buộc — xem chú thích của loader).
+ *
+ * Nguyên tắc: không đổi bố cục của web, chỉ làm focus thật rõ khi ngồi xa và
+ * chừa chỗ cho phần rìa màn hình TV hay bị cắt.
+ */
+
+:root {
+  /* TV thường cắt mất vài phần trăm quanh rìa, nới lề khung ngoài cho chắc. */
+  --frame-gap: 26px;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* scrollIntoView trong tv-remote.js phải chừa chỗ cho header dính ở trên. */
+  scroll-padding: calc(var(--header-h, 72px) + 48px) 48px 96px 48px;
+}
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Không có chuột thì thanh cuộn chỉ chiếm chỗ. */
+::-webkit-scrollbar { width: 0; height: 0; }
+
+/*
+ * Vòng focus: 3px trắng cộng quầng tối để nổi cả trên poster sáng. Web dùng
+ * :focus-visible, còn TV focus bằng script nên tv-remote.js gắn thêm
+ * [data-tv-focus] — giữ cả hai để chắc chắn thấy được ô đang chọn.
+ */
+:focus-visible,
+[data-tv-focus] {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.movie-card:focus-visible,
+.movie-card[data-tv-focus] { outline: none; }
+
+.movie-card[data-tv-focus] .poster {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 10px rgba(5, 4, 3, .65);
+}
+
+.movie-card[data-tv-focus] .poster img { transform: scale(1.04); }
+.movie-card[data-tv-focus] .poster::after { opacity: .9; }
+.movie-card[data-tv-focus] .card-play { opacity: 1; }
+.movie-card[data-tv-focus] h3 { color: var(--amber); }
+
+/* 1080p nhìn từ 3 mét: 6 cột poster là quá nhỏ. */
+.movie-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+.movie-row {
+  grid-auto-columns: clamp(180px, 16vw, 240px);
+  scrollbar-width: none;
+  scroll-padding-inline: 48px;
+}
+
+/* Player nhận focus để tua bằng D-pad — vẽ vòng vào trong cho khỏi che video. */
+video[data-tv-focus] { outline-offset: -3px; }

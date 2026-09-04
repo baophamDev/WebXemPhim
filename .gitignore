@@ -18,3 +18,8 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# webOS: file .ipk do ares-package (hoặc nút Package của webOS Studio) xuất ra.
+# Không commit vì đóng lại lúc nào cũng được từ BaoNhanCinema/.
+webos-out/
+*.ipk

@@ -21,15 +21,20 @@ Sau khi deploy, máy tính cá nhân không cần bật liên tục. Vercel ph�
 
 ```text
 apps/web/                 Frontend React/Vite
+apps/web/public/tv/       Lớp điều khiển TV (D-pad, phím remote LG)
 services/api/             Backend Express
 services/api/src/db.ts    Kết nối PostgreSQL
 services/api/src/providers/ Lớp thay thế nguồn catalog
 supabase/migrations/      Schema PostgreSQL
+BaoNhanCinema/            App TV LG (webOS) — nội dung file .ipk
+build-ipk.cmd             Đóng gói/cài .ipk lên TV LG
 railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
 
 Nguồn catalog mặc định là VSMOV. Database dùng hai trường `provider` và `provider_id`, vì vậy có thể thêm nguồn khác mà không cần đổi schema.
+
+App cho TV LG là **hosted web app**: file `.ipk` chỉ chứa `appinfo.json` + icon, còn nội dung lấy thẳng từ domain Vercel. Nghĩa là sửa web chỉ cần `git push`, không đóng gói lại. Hướng dẫn đầy đủ ở [docs/webos.md](docs/webos.md).
 
 ## 2. Những thứ cần chuẩn bị
 

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>BảoNhànCinema</title>
+    <!--
+      Trang này BÌNH THƯỜNG KHÔNG BAO GIỜ ĐƯỢC MỞ.
+
+      Đây là hosted web app: `main` trong appinfo.json là URL của Vercel, nên
+      WebAppManager của TV nạp thẳng trang đó và bỏ qua hoàn toàn file này. Giữ
+      lại vì hai lý do:
+
+      1) Một số firmware LG (đã có báo cáo ở dòng CN) chặn app đóng gói điều hướng
+         ra URL ngoài. Nếu gặp trường hợp lạ đó, đổi appinfo.json thành
+         "main": "index.html" là app vẫn vào được site bằng cách chuyển hướng
+         dưới đây — điều hướng của trang không bị chặn giống fetch.
+      2) Có gì để nhìn khi mạng chết, thay vì màn hình trắng không giải thích.
+
+      Cố ý viết bằng JS thường + style inline: trang này chạy từ file:// nên
+      không nạp được module script, và cũng không nên phụ thuộc file nào khác.
+    -->
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0806; color: #f7f0e7; }
+      body {
+        display: flex; align-items: center; justify-content: center;
+        font: 400 26px/1.5 system-ui, sans-serif; text-align: center;
+      }
+      strong { display: block; margin-bottom: 12px; font-size: 34px; color: #ffc53d; }
+      small { display: block; margin-top: 18px; font-size: 20px; opacity: .6; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <strong>BảoNhànCinema</strong>
+      Đang mở rạp phim…
+      <small>Nếu dừng ở đây thì TV chưa vào được mạng.</small>
+    </div>
+    <script>
+      // Cùng địa chỉ với "main" trong appinfo.json. Đổi một chỗ thì đổi cả hai.
+      location.replace('https://bao-nhan-cinema.vercel.app/');
+    </script>
+  </body>
+</html>
