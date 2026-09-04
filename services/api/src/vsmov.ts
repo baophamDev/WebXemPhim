@@ -1,3 +1,4 @@
+import { httpError } from './errors.js';
 import type { CatalogFilters, CatalogProvider } from './providers/types.js';
 
 const base = (process.env.VSMOV_API_URL ?? 'https://vsmov.com/api').replace(/\/$/, '');
@@ -20,7 +21,7 @@ async function request(path: string, ttlMs = 120_000) {
   const timer = setTimeout(() => controller.abort(), 20_000);
   try {
     const response = await fetch(key, { signal: controller.signal, headers: { accept: 'application/json', 'user-agent': 'BaoNhanCinema/0.2' } });
-    if (!response.ok) throw new Error(`VSMOV HTTP ${response.status}`);
+    if (!response.ok) throw httpError(502, `Nguồn VSMOV trả HTTP ${response.status}`);
     const value = await response.json();
     cache.set(key, { expires: Date.now() + ttlMs, value });
     return value as any;

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import { z } from 'zod';
@@ -7,6 +8,7 @@ import {
   listCountriesFromDb, listFavorites, listGenresFromDb, listMovies, listPeople, listYearsFromDb,
   saveProgress, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
 } from './db.js';
+import { describeFailure, shortCause } from './errors.js';
 import { catalogProvider, type CatalogFilters } from './providers/index.js';
 import { streamRouter } from './stream.js';
 import { slugifyName } from './text.js';
@@ -105,10 +107,14 @@ async function taxonomyWithFallback(
   };
 }
 
-/** Trạng thái kết nối DB, do initDatabaseWithRetry() ở cuối file cập nhật. */
-export const dbState = { ready: false, error: null as string | null };
+/**
+ * Trạng thái kết nối DB, do initDatabaseWithRetry() ở cuối file cập nhật. `reason`
+ * là lý do ngắn để hiện ở `/api/health` (endpoint công khai) — message đầy đủ chỉ
+ * đi vào log, xem `errors.ts`.
+ */
+export const dbState = { ready: false, reason: null as string | null };
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-cinema-api', provider: catalogProvider.name, database: dbState.ready ? 'ready' : 'connecting', databaseError: dbState.error, time: new Date().toISOString() }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-cinema-api', provider: catalogProvider.name, database: dbState.ready ? 'ready' : 'connecting', databaseError: dbState.reason, time: new Date().toISOString() }));
 app.get('/api/catalog/home', asyncRoute(async (req, res) => res.json(await catalogProvider.home(queryFilters(req.query)))));
 app.get('/api/catalog/lists/:slug', asyncRoute(async (req, res) => res.json(await catalogProvider.list(slugSchema.parse(req.params.slug), queryFilters(req.query)))));
 app.get('/api/catalog/search', asyncRoute(async (req, res) => res.json(await catalogProvider.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query)))));
@@ -232,10 +238,17 @@ app.get('/api/vsmov/search', asyncRoute(async (req, res) => res.json(await catal
 // Playlist HLS đã bóc quảng cáo của nguồn — xem docs/ads.md.
 app.use('/api/stream', streamRouter);
 
-app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const upstream = error?.name === 'AbortError' || String(error?.message).includes('HTTP');
-  const status = Number.isInteger(error?.status) ? error.status : (upstream ? 502 : 400);
-  res.status(status).json({ message: error?.issues?.[0]?.message ?? error?.message ?? 'Yêu cầu không hợp lệ' });
+/**
+ * Chỉ chỗ này quyết định client đọc được gì; luật nằm ở `errors.ts`. `ref` là sợi
+ * dây nối response với dòng log tương ứng — người dùng đọc được mã ngắn, còn chi
+ * tiết (host, cổng, tên bảng, stack) chỉ nằm trong log Railway.
+ */
+app.use((error: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const failure = describeFailure(error, { dbReady: dbState.ready });
+  if (!failure.log) return res.status(failure.status).json({ message: failure.message });
+  const ref = crypto.randomBytes(4).toString('hex');
+  console.error(`[api ${ref}] ${req.method} ${req.originalUrl} -> ${failure.status}`, error);
+  res.status(failure.status).json({ message: failure.message, ref });
 });
 
 const port = Number(process.env.PORT ?? 4000); const host = process.env.HOST ?? '0.0.0.0';
@@ -249,12 +262,12 @@ const port = Number(process.env.PORT ?? 4000); const host = process.env.HOST ?? 
 async function initDatabaseWithRetry(attempt = 1): Promise<void> {
   try {
     await initDatabase();
-    dbState.ready = true; dbState.error = null;
+    dbState.ready = true; dbState.reason = null;
     console.log('Database ready');
   } catch (error) {
-    dbState.ready = false; dbState.error = (error as Error).message;
+    dbState.ready = false; dbState.reason = shortCause(error);
     const delay = Math.min(30_000, 2_000 * 2 ** (attempt - 1));
-    console.error(`Database init failed (lần ${attempt}), thử lại sau ${delay}ms:`, dbState.error);
+    console.error(`Database init failed (lần ${attempt}), thử lại sau ${delay}ms:`, (error as Error).message);
     setTimeout(() => void initDatabaseWithRetry(attempt + 1), delay).unref();
   }
 }

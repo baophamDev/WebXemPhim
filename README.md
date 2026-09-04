@@ -390,6 +390,8 @@ Cả ba lệnh phải kết thúc với exit code `0`. `npm test` chạy bộ te
 - `DATABASE_URL` chỉ đặt ở Railway hoặc `services/api/.env` trên máy local.
 - Không đặt `DATABASE_URL`, database password hoặc Supabase `service_role` key vào biến `VITE_*`.
 - Mọi biến bắt đầu bằng `VITE_` đều có thể được đóng gói vào JavaScript và nhìn thấy trong trình duyệt.
+- API không trả message của lỗi hạ tầng ra client. `connect ECONNREFUSED 127.0.0.1:5432` hay tên bảng trong lỗi Postgres chỉ đi vào log Railway; client nhận một câu chung kèm mã `ref` để đối chiếu log. Luật ở [services/api/src/errors.ts](services/api/src/errors.ts).
+- `/api/health` chỉ hiện lý do ngắn khi DB lỗi (`không phân giải được tên miền`, `sai mật khẩu database`) vì đây là endpoint công khai.
 - `deviceId` dùng cho yêu thích và lịch sử xem được lưu trong `localStorage` của từng trình duyệt.
 - Dự án hiện chưa có đăng nhập người dùng. Xóa dữ liệu trình duyệt sẽ tạo `deviceId` mới.
 - CORS chỉ kiểm soát trình duyệt, không phải cơ chế xác thực API. Endpoint đồng bộ hiện vẫn là endpoint công khai nếu ai đó biết URL Railway.

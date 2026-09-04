@@ -21,6 +21,7 @@ import net from 'node:net';
 import express from 'express';
 import { z } from 'zod';
 import { getEpisodes } from './db.js';
+import { httpError } from './errors.js';
 import { filterPlaylist, type AdFilterReport } from './hls.js';
 
 const MAX_PLAYLIST_BYTES = 4 * 1024 * 1024;
@@ -63,13 +64,22 @@ function isPrivateAddress(address: string) {
     || value.startsWith('fe80') || value.startsWith('::ffff:127.') || value.startsWith('::ffff:10.');
 }
 
+/** Tên miền không phân giải được là lỗi của nguồn, không phải của người gọi. */
+async function resolveHost(hostname: string) {
+  try {
+    return await dns.lookup(hostname, { all: true });
+  } catch {
+    throw httpError(502, 'Không phân giải được tên miền của nguồn');
+  }
+}
+
 async function assertPublicUrl(raw: string) {
   const url = new URL(raw);
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Chỉ nhận http/https');
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw httpError(400, 'Chỉ nhận http/https');
   const hostname = url.hostname.replace(/^\[|\]$/g, '');
-  const addresses = net.isIP(hostname) ? [{ address: hostname }] : await dns.lookup(hostname, { all: true });
-  if (!addresses.length) throw new Error('Không phân giải được tên miền');
-  if (addresses.some((entry) => isPrivateAddress(entry.address))) throw new Error('Địa chỉ nội bộ bị chặn');
+  const addresses = net.isIP(hostname) ? [{ address: hostname }] : await resolveHost(hostname);
+  if (!addresses.length) throw httpError(502, 'Không phân giải được tên miền của nguồn');
+  if (addresses.some((entry) => isPrivateAddress(entry.address))) throw httpError(400, 'Địa chỉ nội bộ bị chặn');
   return url;
 }
 
@@ -83,7 +93,7 @@ async function readCapped(response: Response) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_PLAYLIST_BYTES) { await reader.cancel(); throw new Error('Playlist quá lớn'); }
+    if (size > MAX_PLAYLIST_BYTES) { await reader.cancel(); throw httpError(502, 'Playlist của nguồn quá lớn'); }
     chunks.push(value);
   }
   return Buffer.concat(chunks).toString('utf8');
@@ -104,7 +114,7 @@ async function fetchPlaylist(url: string) {
         referer: `${origin}/`
       }
     });
-    if (!response.ok) throw new Error(`Nguồn trả HTTP ${response.status}`);
+    if (!response.ok) throw httpError(502, `Nguồn trả HTTP ${response.status}`);
     // response.url là URL sau redirect — phải dùng nó làm base, không thì đường
     // dẫn tương đối trong playlist sẽ resolve về host cũ.
     return { text: await readCapped(response), finalUrl: response.url || url };
@@ -152,8 +162,8 @@ function sendPlaylist(res: express.Response, entry: CacheEntry) {
 
 async function episodeStreamUrl(rawId: unknown) {
   const episode = await getEpisodes(idSchema.parse(rawId));
-  if (!episode) throw Object.assign(new Error('Không tìm thấy tập phim'), { status: 404 });
-  if (!episode.m3u8Url) throw Object.assign(new Error('Tập này chỉ có trang nhúng, không có m3u8'), { status: 404 });
+  if (!episode) throw httpError(404, 'Không tìm thấy tập phim');
+  if (!episode.m3u8Url) throw httpError(404, 'Tập này chỉ có trang nhúng, không có m3u8');
   return episode.m3u8Url;
 }
 
@@ -178,6 +188,6 @@ streamRouter.get('/episode/:id/report', asyncRoute(async (req, res) => {
 streamRouter.get('/hls', asyncRoute(async (req, res) => {
   const query = z.object({ u: z.string().min(1).max(4_000), s: z.string().min(1).max(200) }).parse(req.query);
   const url = Buffer.from(query.u, 'base64url').toString('utf8');
-  if (!verify(url, query.s)) throw Object.assign(new Error('Link không hợp lệ hoặc đã hết hiệu lực'), { status: 403 });
+  if (!verify(url, query.s)) throw httpError(403, 'Link không hợp lệ hoặc đã hết hiệu lực');
   sendPlaylist(res, await loadPlaylist(url));
 }));
