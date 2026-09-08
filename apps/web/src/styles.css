@@ -205,9 +205,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 a { color: inherit; text-decoration: none; transition: color .16s, background-color .16s, border-color .16s; }
 img { max-width: 100%; }
 :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-/* Placeholder: trình duyệt mặc định phủ thêm opacity ~0.5 lên màu chữ mờ nên
-   dòng gợi ý trong ô tìm kiếm chìm hẳn. Ép opacity 1 để nó đúng màu token. */
-input::placeholder { color: var(--ink-faint); opacity: 1; }
+/* Placeholder: màu sáng hơn chữ mờ một bậc để gợi ý tìm kiếm đọc được ngay,
+   opacity 1 để không bị trình duyệt phủ thêm lớp mờ mặc định. */
+input::placeholder { color: var(--ink-dim); opacity: 1; }
 
 /* Góc xoay aurora cũ đã nghỉ hưu cùng viền xoay của khung ngoài (xem .app-frame):
    chuyển động giờ do lib border-beam vẽ trên hero-panel. Giữ @property để mọi
