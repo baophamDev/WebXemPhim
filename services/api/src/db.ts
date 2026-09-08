@@ -118,12 +118,22 @@ async function migrateSchema() {
   await backfill();
 }
 
-/** Lấp dữ liệu cho cột/bảng mới từ dữ liệu cũ. Idempotent, chạy mỗi lần boot. */
+/**
+ * Lấp dữ liệu cho cột/bảng mới từ dữ liệu cũ. Idempotent, chạy mỗi lần boot.
+ */
 async function backfill() {
-  const stale = await sql<{ id: number; name: string; origin_name: string | null; slug: string }[]>`
-    SELECT id,name,origin_name,slug FROM movies WHERE search_text IS NULL LIMIT 5000`;
-  for (const row of stale) {
-    await sql`UPDATE movies SET search_text=${movieSearchText(row.name, row.origin_name, row.slug)} WHERE id=${row.id}`;
+  // Phim sync trước khi schema có origin_name khớp vẫn thiếu tên gốc trong
+  // search_text ("one piece" không ra "Đảo Hải Tặc"), dù raw_json còn nguyên
+  // originName — dùng nó để vá cả hai cột rồi tính lại search_text.
+  const staleOrigin = await sql<{ id: number; name: string; origin_name: string | null; slug: string }[]>`
+    SELECT id,name,origin_name,slug FROM movies
+    WHERE search_text IS NULL OR (origin_name IS NULL AND raw_json->>'originName' IS NOT NULL)
+    LIMIT 5000`;
+  for (const row of staleOrigin) {
+    const origin = row.origin_name
+      ?? (await sql`SELECT raw_json->>'originName' AS origin FROM movies WHERE id=${row.id}`)[0]?.origin
+      ?? null;
+    await sql`UPDATE movies SET origin_name=${origin}, search_text=${movieSearchText(row.name, origin, row.slug)} WHERE id=${row.id}`;
   }
 
   // movie_people (bảng cũ, chỉ có tên phẳng) -> people + movie_cast
@@ -218,11 +228,15 @@ async function replaceCast(tx: Executor, movieId: number, actors: string[], dire
 
 export async function upsertMovie(input: any): Promise<number> {
   const movie = input.movie ?? input; const tmdb = movie.tmdb ?? {}; const imdb = movie.imdb ?? {};
-  const name = movie.name ?? movie.origin_name ?? movie.slug;
+  // Danh sách đọc cả snake_case (payload thô của nguồn lẫn bản sync) lẫn camelCase
+  // (bản đã chuẩn hoá từ provider/ingest). Chỉ `origin_name` từng bị bỏ sót: nó
+  // rơi vào search_text, và kho mất tên gốc là "one piece" không ra "Đảo Hải Tặc".
+  const originName = movie.origin_name ?? movie.originName ?? null;
+  const name = movie.name ?? originName ?? movie.slug;
   return sql.begin(async (tx) => {
     const rows = await tx`
       INSERT INTO movies(provider,provider_id,slug,name,origin_name,description,type,status,year,duration,quality,language,poster_url,thumb_url,trailer_url,rating,view_count,tmdb_id,imdb_id,raw_json,search_text,updated_at)
-      VALUES(${movie.provider ?? 'vsmov'},${scalar(movie.providerId ?? movie._id)},${movie.slug},${name},${movie.origin_name ?? null},${movie.content ?? movie.description ?? null},${movie.type ?? 'single'},${movie.status ?? null},${Number(movie.year ?? 0) || null},${movie.time ?? movie.duration ?? null},${movie.quality ?? null},${movie.lang ?? movie.language ?? null},${typeof (movie.poster_url ?? movie.posterUrl) === 'string' ? (movie.poster_url ?? movie.posterUrl) : null},${typeof (movie.thumb_url ?? movie.thumbUrl) === 'string' ? (movie.thumb_url ?? movie.thumbUrl) : null},${movie.trailer_url ?? movie.trailerUrl ?? null},${Number(tmdb.vote_average ?? movie.rating ?? 0) || null},${Number(movie.view ?? movie.viewCount ?? 0)},${scalar(tmdb.id ?? movie.tmdbId)},${scalar(imdb.id ?? movie.imdbId)},${tx.json(movie)},${movieSearchText(name, movie.origin_name, movie.slug)},NOW())
+      VALUES(${movie.provider ?? 'vsmov'},${scalar(movie.providerId ?? movie._id)},${movie.slug},${name},${originName},${movie.content ?? movie.description ?? null},${movie.type ?? 'single'},${movie.status ?? null},${Number(movie.year ?? 0) || null},${movie.time ?? movie.duration ?? null},${movie.quality ?? null},${movie.lang ?? movie.language ?? null},${typeof (movie.poster_url ?? movie.posterUrl) === 'string' ? (movie.poster_url ?? movie.posterUrl) : null},${typeof (movie.thumb_url ?? movie.thumbUrl) === 'string' ? (movie.thumb_url ?? movie.thumbUrl) : null},${movie.trailer_url ?? movie.trailerUrl ?? null},${Number(tmdb.vote_average ?? movie.rating ?? 0) || null},${Number(movie.view ?? movie.viewCount ?? 0)},${scalar(tmdb.id ?? movie.tmdbId)},${scalar(imdb.id ?? movie.imdbId)},${tx.json(movie)},${movieSearchText(name, originName, movie.slug)},NOW())
       ON CONFLICT(slug) DO UPDATE SET provider=EXCLUDED.provider,provider_id=EXCLUDED.provider_id,name=EXCLUDED.name,origin_name=EXCLUDED.origin_name,
         description=EXCLUDED.description,type=EXCLUDED.type,status=EXCLUDED.status,year=EXCLUDED.year,duration=EXCLUDED.duration,
         quality=EXCLUDED.quality,language=EXCLUDED.language,poster_url=EXCLUDED.poster_url,thumb_url=EXCLUDED.thumb_url,

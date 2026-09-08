@@ -35,6 +35,11 @@ const apiBaseUrl=(import.meta.env.VITE_API_URL??'/api').replace(/\/$/,'');
  * console và cho SyncStatus hiện đúng nguyên nhân thay vì "cổng 4000".
  */
 export const apiBaseIsRelative=!/^https?:\/\//i.test(apiBaseUrl);
+/**
+ * URL của endpoint ingest (web tự kéo phim từ vsmov rồi gửi về đây). Tách riêng
+ * vì `useVsmov` cần nó mà không được import cả cinemaApi vào module đó.
+ */
+export const apiIngestUrl=`${apiBaseUrl}/ingest/movies`;
 export function apiOfflineHint(){
   const local=typeof location!=='undefined'&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
   if(apiBaseIsRelative&&!local)return 'VITE_API_URL đang là đường dẫn tương đối — cần trỏ sang URL API thật';
@@ -104,7 +109,6 @@ export const cinemaApi=createApi({
   tagTypes:['Movie','Sync','Favorite','Progress','Health'],
   endpoints:(builder)=>({
     getCatalog:builder.query<MovieList,CatalogQuery>({query:({kind,value,...params})=>({url:catalogUrl(kind,value),params})}),
-    searchCatalog:builder.query<MovieList,{q:string;page?:number;limit?:number;type?:string;status?:string;year?:string}>({query:({q,...params})=>({url:'/catalog/search',params:{q,...params}})}),
     getTaxonomy:builder.query<TaxonomyList,'genres'|'countries'|'years'|'actors'|'codes'>({query:(kind)=>`/catalog/${kind}`}),
     // Menu điều hướng đổi rất chậm — giữ cache 10 phút để không gọi lại mỗi lần đổi route.
     getNavigation:builder.query<Navigation,void>({query:()=>'/catalog/navigation',keepUnusedDataFor:600}),
@@ -149,7 +153,7 @@ export const cinemaApi=createApi({
   })
 });
 
-export const {useGetCatalogQuery,useSearchCatalogQuery,useGetTaxonomyQuery,useGetNavigationQuery,useSearchAllQuery,useGetPeopleQuery,useGetPersonQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetImportStatusQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;
+export const {useGetCatalogQuery,useGetTaxonomyQuery,useGetNavigationQuery,useSearchAllQuery,useGetPeopleQuery,useGetPersonQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetImportStatusQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;
 /** Tìm sub là hành động người xem bấm, không phải dữ liệu của trang → lazy. */
 export const {useLazySearchSubtitlesQuery,useFetchSubtitleMutation,useFetchSubtitleUrlMutation}=cinemaApi;
 export const {usePrefetch}=cinemaApi;

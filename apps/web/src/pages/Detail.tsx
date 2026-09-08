@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ExternalLink, Heart, Play, RefreshCw, Users } from 'lucide-react';
 import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFavoriteMutation } from '../api';
+import { useVsmovDetail } from '../useVsmov';
 import { preloadPlayer } from '../chunks';
 import { filmSources, filmSourceUrl } from '../filmSources';
 import { previewFromState, recallMovie, rememberMovie } from '../preview';
@@ -57,6 +58,26 @@ function CastLinks({ cast, names, kind }: { cast: CastMember[]; names: string[];
 }
 
 /**
+ * Nhóm tập từ vsmov (chưa có id trong kho) đổi sang `Episode[]` với id âm —
+ * đủ để bấm xem (`Watch` dùng link phát chứ không truy vấn id khi có state),
+ * và không đụng id thật của kho khi ingest xong.
+ */
+function episodesFromVsmov(groups: { server_name: string; server_data: { name: string; link_embed: string; link_m3u8: string | null }[] }[], slug: string): Episode[] {
+  const episodes: Episode[] = [];
+  for (const group of groups) {
+    for (const entry of group.server_data) {
+      const number = Number.parseInt(String(entry.name ?? '').replace(/\D/g, ''), 10);
+      episodes.push({
+        id: -(episodes.length + 1), movieId: 0, serverName: group.server_name,
+        name: entry.name, episodeNumber: Number.isFinite(number) ? number : null,
+        embedUrl: entry.link_embed, m3u8Url: entry.link_m3u8
+      });
+    }
+  }
+  return episodes;
+}
+
+/**
  * Khung xương cho lúc chưa có cả bản mô tả (mở thẳng URL, hoặc F5 giữa trang).
  * Vẫn dựng đúng hình khối của trang chi tiết thay vì một vòng xoay giữa màn hình:
  * người xem thấy trang đang hình thành thì chờ được, thấy vòng xoay thì tưởng treo.
@@ -82,17 +103,20 @@ export default function Detail() {
   const result = useGetMovieQuery(slug);
   const fetched = result.data?.movie ?? null;
   /**
-   * API trả 202 (`movie: null` kèm `importing`) khi phim chưa có trong kho: nó đã
-   * mở job nhập ở nền và không chặn request. Đó là tín hiệu để poll tiến trình.
+   * API trả 202 (`movie: null` kèm `importing`) khi phim chưa có trong kho. Server
+   * không gọi được vsmov (IP bị chặn) nên job đó sẽ đổ — trình duyệt tự kéo detail
+   * từ vsmov (IP nhà không bị chặn) và gửi về kho qua ingest. Lấy được là có
+   * đầy đủ phim + tập để xem ngay, không chờ đợi ai.
    */
   const active = Boolean(result.data && !fetched);
   const progress = useImportProgress(slug, active);
+  const direct = useVsmovDetail(slug, !fetched);
   /**
    * Bản mô tả của thẻ phim vừa bấm — có poster, tên, năm, điểm. Đủ để vẽ nửa trên
    * của trang ngay khi điều hướng, trong lúc API còn đang kéo danh sách tập về.
    */
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
-  const movie: Movie | null = fetched ?? preview;
+  const movie: Movie | null = fetched ?? (direct.data ? ({ ...direct.data.movie, episodes: episodesFromVsmov(direct.data.episodes, direct.data.movie.slug) } as Movie) : null) ?? preview;
   const failed = result.isError || Boolean(progress.failure);
   // Hook entrance phải đứng trước mọi `return` có điều kiện (luật hooks):
   // đổi slug thì diễn lại từ đầu, còn skeleton/error thì ref không gắn vào đâu.
@@ -115,8 +139,8 @@ export default function Detail() {
   const cast = movie.cast ?? [];
   const actors = cast.filter((member) => member.kind === 'actor');
   const first = movie.episodes?.[0];
-  /** Chưa có bản trong kho: phần dưới trang là tiến trình tải, không phải "chưa có tập". */
-  const loading = !fetched;
+  /** Chưa có bản trong kho: nguồn phát đến từ vsmov trực tiếp hoặc đang tải. */
+  const loading = !fetched && !direct.data;
 
   return <Shell flush>
     <section className="detail-hero" ref={scope}>

@@ -181,6 +181,28 @@ async function listWithFallback(slug: string, filters: CatalogFilters) {
 }
 
 /**
+ * Tìm kiếm cũng phải sống khi VSMOV chặn IP server (Railway bị 403) — cùng luật
+ * với `homeWithFallback`/`listWithFallback`: nguồn chết thì trả kết quả từ DB.
+ * Kho nhỏ hơn catalog thật nhưng khớp không dấu và theo tên diễn viên, nên vẫn
+ * có ích hơn một trang lỗi.
+ */
+async function searchWithFallback(keyword: string, filters: CatalogFilters) {
+  try {
+    const remote = await catalog.search(keyword, filters);
+    if (remote.items.length) return remote;
+  } catch (error) {
+    console.warn('VSMOV không trả lời tìm kiếm, chuyển sang DB:', (error as Error).message);
+  }
+  const year = filters.year ? Number(filters.year) : undefined;
+  const page = await listMovies({
+    q: keyword, page: filters.page ?? 1, limit: filters.limit ?? 24,
+    type: filters.type, year: Number.isFinite(year) ? year : undefined,
+    genre: filters.category, country: filters.country, sort: 'recent'
+  });
+  return { ...page, source: 'database' as const };
+}
+
+/**
  * Taxonomy ưu tiên VSMOV (có slug chuẩn để gọi tiếp), VSMOV chết thì
  * dựng từ DB để menu điều hướng không bao giờ trắng.
  */
@@ -227,7 +249,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-ci
 const catalogKey = (prefix: string) => (req: express.Request) => routeKey(prefix, { ...req.query, ...req.params });
 app.get('/api/catalog/home', serverCachedRoute(60, catalogKey('catalog:home'), (req) => homeWithFallback(queryFilters(req.query))));
 app.get('/api/catalog/lists/:slug', serverCachedRoute(60, catalogKey('catalog:list'), (req) => listWithFallback(slugSchema.parse(req.params.slug), queryFilters(req.query))));
-app.get('/api/catalog/search', serverCachedRoute(30, catalogKey('catalog:search'), (req) => catalog.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
+app.get('/api/catalog/search', serverCachedRoute(30, catalogKey('catalog:search'), (req) => searchWithFallback(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
 app.get('/api/catalog/genres', serverCachedRoute(600, catalogKey('catalog:genres'), () => taxonomyWithFallback(() => catalog.genres(), listGenresFromDb)));
 app.get('/api/catalog/genres/:slug', serverCachedRoute(60, catalogKey('catalog:genre'), (req) => catalog.byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query))));
 app.get('/api/catalog/countries', serverCachedRoute(600, catalogKey('catalog:countries'), () => taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb)));
@@ -378,6 +400,57 @@ app.post('/api/import/:slug', asyncRoute(async (req, res) => {
 }));
 // Tìm trực tiếp ở VSMOV, bỏ qua kho đã lưu.
 app.get('/api/provider/search', asyncRoute(async (req, res) => res.json(await catalog.search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
+
+/**
+ * Nhận một phim do **trình duyệt** vừa kéo trực tiếp từ VSMOV rồi gửi về. VSMOV
+ * chặn IP datacenter nhưng không chặn IP nhà, nên khách là người duy trì kho: web
+ * gọi vsmov ngay trong trình duyệt (CORS của nguồn là `*`) rồi POST payload đã
+ * chuẩn hoá về đây. Lần xem sau đọc thẳng DB, và tiến trình/xem tiếp hoạt động vì
+ * có `episode_id` thật.
+ */
+const ingestSchema = z.object({
+  movie: z.object({
+    provider: z.string().min(1).default('vsmov'),
+    providerId: z.string().nullable().optional(),
+    slug: slugSchema,
+    name: z.string().trim().min(1).max(300),
+    originName: z.string().max(300).nullable().optional(),
+    description: z.string().nullable().optional(),
+    type: z.string().min(1).default('single'),
+    status: z.string().nullable().optional(),
+    year: z.number().int().nullable().optional(),
+    duration: z.string().nullable().optional(),
+    quality: z.string().nullable().optional(),
+    language: z.string().nullable().optional(),
+    posterUrl: z.string().nullable().optional(),
+    thumbUrl: z.string().nullable().optional(),
+    trailerUrl: z.string().nullable().optional(),
+    rating: z.number().nullable().optional(),
+    viewCount: z.number().int().nonnegative().optional(),
+    tmdbId: z.string().nullable().optional(),
+    imdbId: z.string().nullable().optional(),
+    genres: z.array(z.string()).optional(),
+    countries: z.array(z.string()).optional(),
+    actors: z.array(z.string()).optional(),
+    directors: z.array(z.string()).optional()
+  }),
+  episodes: z.array(z.object({
+    server_name: z.string().min(1),
+    server_data: z.array(z.object({
+      name: z.string().min(1),
+      filename: z.string().nullable().optional(),
+      link_embed: z.string().min(1),
+      link_m3u8: z.string().nullable().optional()
+    }))
+  })).optional()
+});
+app.post('/api/ingest/movies', asyncRoute(async (req, res) => {
+  const body = ingestSchema.parse(req.body);
+  const movieId = await upsertMovie(body.movie);
+  await upsertEpisodes(movieId, body.episodes ?? []);
+  void cacheInvalidate('web:movies');
+  res.status(201).json({ movie: await getMovie(body.movie.slug, true) });
+}));
 
 /**
  * Chỉ chỗ này quyết định client đọc được gì; luật nằm ở `errors.ts`. `ref` là sợi

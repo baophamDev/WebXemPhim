@@ -128,11 +128,15 @@ function Screen({ slug, title, episode, episodes }: {
   const started = useRef(Date.now());
   const subs = useSubtitles({ movieSlug: slug, episode, episodes });
 
+  // Tiến trình chỉ ghi cho tập đã có trong kho (id dương); tập id âm là vsmov
+  // trực tiếp — kho chưa có dòng nào để gắn tiến trình vào.
+  const trackable = episode.id > 0;
   useEffect(() => {
+    if (!trackable) return;
     save({ episodeId: episode.id, position: 1, duration: 0 });
     started.current = Date.now();
     return () => { save({ episodeId: episode.id, position: Math.max(1, Math.round((Date.now() - started.current) / 1000)), duration: 0 }); };
-  }, [episode.id]);
+  }, [episode.id, trackable]);
 
   const index = episodes.findIndex((item) => item.id === episode.id);
   return <div className="watch-page">
@@ -156,7 +160,7 @@ function Screen({ slug, title, episode, episodes }: {
     </div>
     <div className="watch-footer">
       {index > 0 ? <Link to={`/watch/${slug}/${episodes[index - 1].id}`}><ChevronLeft />Tập trước</Link> : <span />}
-      <button onClick={() => save({ episodeId: episode.id, position: 0, duration: 0, completed: true })}><Check />Đã xem</button>
+      <button disabled={!trackable} onClick={() => save({ episodeId: episode.id, position: 0, duration: 0, completed: true })}><Check />Đã xem</button>
       {index >= 0 && index < episodes.length - 1 ? <Link to={`/watch/${slug}/${episodes[index + 1].id}`}>Tập sau<ChevronRight /></Link> : <span />}
     </div>
   </div>;
@@ -170,8 +174,9 @@ function Screen({ slug, title, episode, episodes }: {
  * những thứ đó đến sau vài trăm ms cũng không ai để ý, nhưng bắt người xem chờ nó
  * mới được phát thì có.
  *
- * Trước đây trang này chỉ gọi phim rồi tìm tập trong danh sách trả về, nên thời
- * gian tới khung hình đầu tiên bằng thời gian của request nặng nhất.
+ * Phim chưa có trong kho: `fetchedMovie` null, nhưng detail từ vsmov (id âm) vẫn
+ * cho phát ngay — trình duyệt tự kéo về ở trang chi tiết trước khi bấm xem, và
+ * ingest đang ghi vào kho ở nền cho lần sau.
  */
 export default function Watch() {
   const { slug = '', episodeId = '' } = useParams();
@@ -184,7 +189,10 @@ export default function Watch() {
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
   const movie = fetchedMovie ?? preview;
   const episodes = fetchedMovie?.episodes ?? [];
-  const episode = episodes.find((item) => item.id === id) ?? episodeQuery.data ?? null;
+  // Id âm là tập vsmov chưa qua kho: nó nằm trong `preview` (detail đã kéo về ở
+  // trang trước và nhớ lại), không phải truy vấn `/episodes/:id`.
+  const direct = !Number.isInteger(id) || id > 0 ? null : (preview?.episodes ?? []).find((item) => item.id === id) ?? null;
+  const episode = episodes.find((item) => item.id === id) ?? direct ?? episodeQuery.data ?? null;
 
   if (!episode) {
     // Chỉ kết luận "không có tập này" khi cả hai request đã yên: một cái lỗi mà cái
@@ -192,5 +200,5 @@ export default function Watch() {
     if (episodeQuery.isFetching || movieQuery.isFetching) return <div className="watch-loading"><LoaderCircle className="spin" /></div>;
     return <div className="watch-loading"><ErrorState message="Tập phim không còn tồn tại." /></div>;
   }
-  return <Screen slug={slug} title={movie?.name || 'Đang tải tên phim'} episode={episode} episodes={episodes} />;
+  return <Screen slug={slug} title={movie?.name || 'Đang tải tên phim'} episode={episode} episodes={episodes.length ? episodes : (preview?.episodes ?? [])} />;
 }

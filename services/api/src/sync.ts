@@ -1,9 +1,18 @@
-import { getSyncState, setSyncState, upsertEpisodes, upsertMovie } from './db.js';
+import { getSyncState, setSyncState, upsertMovie } from './db.js';
 import { catalog } from './providers/index.js';
 
 let running = false;
-const SYNC_BATCH = 4;
 
+/**
+ * Đồng bộ danh sách cho trang chủ: chỉ các trang `/danh-sach/phim-moi-cap-nhat`
+ * ở mức thẻ phim (metadata), không kéo detail từng phim.
+ *
+ * Detail + tập giờ do trình duyệt kéo thẳng từ VSMOV và gửi về qua
+ * `POST /api/ingest/movies` khi người dùng thực sự mở phim — đúng nghĩa "phim
+ * nào được xem thì kho có phim đó". Bulk sync detail từng phim (lô 4, hàng
+ * trăm request tới nguồn) vừa chậm vừa đập vào provider, và trên Railway thì
+ * còn bị chặn IP hoàn toàn.
+ */
 export async function syncLatest(maxPages?: number) {
   if (running) return getSyncState();
   running = true;
@@ -16,22 +25,12 @@ export async function syncLatest(maxPages?: number) {
     for (let page = 1; page <= totalPages; page++) {
       const payload = page === 1 ? first : await catalog.latest(page);
       const items = payload.items ?? [];
-      // Xử lý theo lô: trước đây mỗi phim là một chuỗi fetch tuần tự, 8 trang
-      // (~200 phim) mất rất lâu. Lô 4 vừa đủ nhanh mà không đập vào provider.
-      for (let index = 0; index < items.length; index += SYNC_BATCH) {
-        await Promise.all(items.slice(index, index + SYNC_BATCH).map(async (item) => {
-          try {
-            // Chỉ upsert bản detail: bản list là tập con của nó, upsert 2 lần là thừa.
-            const detail = await catalog.detail(item.slug);
-            const movieId = await upsertMovie(detail.movie);
-            await upsertEpisodes(movieId, detail.episodes);
-          } catch {
-            // Detail lỗi thì vẫn giữ được metadata từ trang danh sách.
-            await upsertMovie(item).catch(() => undefined);
-          }
-        }));
-        processed += Math.min(SYNC_BATCH, items.length - index);
+      for (const item of items) {
+        // Bản list là tập con của bản detail; ghi lẫn vào không phá gì (upsert
+        // theo slug) và lấp nhanh kho cho trang chủ khi nguồn cho phép.
+        await upsertMovie(item).catch(() => undefined);
       }
+      processed += items.length;
       await setSyncState({ page, processed });
     }
     await setSyncState({ status: 'completed' });

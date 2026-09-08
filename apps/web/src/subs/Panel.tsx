@@ -113,7 +113,9 @@ export function SubtitlePicker({ subs, episodeId }: { subs: Subtitles; episodeId
       <div className="sub-actions">
         <button type="button" onClick={() => picker.current?.click()}><Upload />Chọn file</button>
         <button type="button" className={pasting ? 'on' : ''} onClick={() => setPasting(!pasting)}><Link2 />Dán link</button>
-        <button type="button" onClick={() => void find({ episodeId, lang: 'vi' })} disabled={found.isFetching}><Search />Tìm tự động</button>
+        {/* Tìm tự động hỏi API theo episodeId trong kho; tập id âm (vsmov trực
+            tiếp, chưa ingest) thì API không có dòng nào để tra — ẩn đi. */}
+        {episodeId > 0 ? <button type="button" onClick={() => void find({ episodeId, lang: 'vi' })} disabled={found.isFetching}><Search />Tìm tự động</button> : null}
       </div>
       <input
         ref={picker} type="file" multiple hidden accept={ACCEPT}

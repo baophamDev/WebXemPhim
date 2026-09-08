@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Database, Globe, Search, Users } from 'lucide-react';
-import { useSearchAllQuery, useSearchCatalogQuery } from '../api';
+import { Database, Search, Users } from 'lucide-react';
+import { useSearchAllQuery } from '../api';
+import { useVsmovSearch } from '../useVsmov';
+import { rememberMovies } from '../preview';
 import { Breadcrumb, EmptyState, ErrorState, MovieCard, Pagination, RailLabel, Shell, SkeletonGrid, useDebounced } from '../ui';
 
 /**
  * Một khung tìm kiếm cho cả phim và người.
  *
  * `auto`: ưu tiên kho đã lưu vì nó khớp không dấu ("tran thanh" ra "Trấn Thành")
- * và tìm được theo tên diễn viên; chỉ khi kho không có gì mới hỏi sang vsmov.
- * `vsmov`: gọi thẳng `/api/catalog/search` → `/tim-kiem?keyword=` của vsmov.
- * Trước đây chỉ có nhánh auto, nên khi kho có đúng 1 phim khớp lệch là không bao
- * giờ thấy được catalog đầy đủ của vsmov — giờ chọn nguồn được bằng tay.
+ * và tìm được theo tên diễn viên; song song đó hỏi thẳng vsmov từ trình duyệt
+ * (nguồn không chặn IP nhà) để kết quả không phụ thuộc kho đã có gì.
+ * `vsmov`: bỏ qua kho, chỉ xem kết quả nguồn.
+ *
+ * Kết quả vsmov được ghi lại vào kho tạm (`rememberMovies`) để trang chi tiết
+ * bấm vào là có poster ngay; bản đầy đủ sẽ do trang chi tiết kéo về.
  */
 type Source = 'auto' | 'vsmov';
 
@@ -27,16 +31,17 @@ export default function SearchPage() {
   }, [q, source]);
 
   const local = useSearchAllQuery({ q, page, limit: 24 }, { skip: source === 'vsmov' || q.length < 1 });
-  // Kho không trả gì HOẶC gọi kho lỗi thì vẫn thử nguồn ngoài, thay vì chỉ khi isSuccess.
-  const localDone = local.isSuccess || local.isError;
-  const fallback = source === 'auto' && localDone && (local.isError || local.data?.movies.items.length === 0);
-  const useRemote = source === 'vsmov' || fallback;
-  const remote = useSearchCatalogQuery({ q, page, limit: 24 }, { skip: !useRemote || q.length < 2 });
+  const remote = useVsmovSearch(q, page, 24, q.length >= 2);
   const people = local.data?.people ?? [];
-  const movies = useRemote ? remote.data : local.data?.movies;
-  const busy = local.isFetching || remote.isFetching;
-  const failed = useRemote ? remote.isError : local.isError;
-  const retry = useRemote ? remote.refetch : local.refetch;
+
+  // Chọn nguồn hiển thị: auto thì vsmov là chính (kho đầy đủ hơn), chỉ về kho khi
+  // nguồn đang lỗi — người dùng vẫn có kết quả trong khi nguồn chết.
+  const useRemote = source === 'vsmov' || !remote.error;
+  const chosen = useRemote ? remote.data : local.data?.movies ?? null;
+  const busy = useRemote ? remote.isFetching : local.isFetching;
+  const failed = useRemote ? Boolean(remote.error) : local.isError;
+  const movies = chosen;
+  useEffect(() => { if (movies?.items.length) rememberMovies(movies.items); }, [movies]);
 
   return <Shell>
     <div className="page-container page-top">
@@ -53,10 +58,10 @@ export default function SearchPage() {
         </div>
         <div className="chip-row" role="group" aria-label="Nguồn tìm kiếm">
           <button type="button" className={source === 'auto' ? 'chip active' : 'chip'} onClick={() => setSource('auto')}>
-            <Database /> Kho đã lưu
+            <Database /> Tìm tất cả
           </button>
           <button type="button" className={source === 'vsmov' ? 'chip active' : 'chip'} onClick={() => setSource('vsmov')}>
-            <Globe /> vsmov
+            <Search /> Chỉ nguồn vsmov
           </button>
         </div>
       </div>
@@ -75,14 +80,15 @@ export default function SearchPage() {
       <section className="library-section">
         {q ? <div className="section-heading"><div><RailLabel prefix="MỤC">Phim</RailLabel><h2>Kết quả</h2></div></div> : null}
         {!q ? <EmptyState title="Nhập từ khoá" message="Tìm theo tên phim, tên gốc, hoặc tên diễn viên — không cần dấu." />
+          : q.length < 2 ? <EmptyState title="Từ khoá quá ngắn" message="Nguồn vsmov cần từ khoá từ 2 ký tự." />
           : busy && !movies ? <SkeletonGrid />
-          : failed ? <ErrorState onRetry={retry} />
+          : failed ? <ErrorState message={useRemote ? (remote.error ?? undefined) : undefined} onRetry={() => setPage(1)} />
           : movies?.items.length
             ? <>
                 <div className="movie-grid">{movies.items.map((movie, index) => <MovieCard key={`${movie.slug}-${index}`} movie={movie} />)}</div>
                 <Pagination current={page} total={movies.pagination.totalPages} onChange={setPage} />
               </>
-            : <EmptyState title="Không có phim nào khớp" message={useRemote ? 'Nguồn vsmov cần từ khoá từ 2 ký tự. Thử từ khoá ngắn hơn hoặc đổi sang kho đã lưu.' : 'Thử từ khoá ngắn hơn, bấm vào một diễn viên phía trên, hoặc đổi nguồn sang vsmov.'} />}
+            : <EmptyState title="Không có phim nào khớp" message="Thử từ khoá ngắn hơn hoặc đổi sang kho đã lưu." />}
       </section>
     </div>
   </Shell>;
