@@ -1,8 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { bootUrl, claimBoot } from './boot';
-import { noteAnswer, sourceParam } from './source';
-import type { CatalogQuery, Episode, ImportJob, InactiveSource, Movie, MovieList, Navigation, Person, PersonList, SourceHealth, SyncState, TaxonomyList, UnifiedSearch } from './types';
+import type { CatalogQuery, Episode, ImportJob, Movie, MovieList, Navigation, Person, PersonList, SubtitleFile, SubtitleSearch, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
 /**
  * crypto.randomUUID chỉ có trong secure context. Mở web qua IP LAN
@@ -27,8 +26,6 @@ function readDeviceId(){
 }
 export const deviceId=readDeviceId();
 const apiBaseUrl=(import.meta.env.VITE_API_URL??'/api').replace(/\/$/,'');
-/** Player cần tự dựng URL playlist (/stream/...) chứ không đi qua RTK Query. */
-export {apiBaseUrl};
 
 /**
  * Base URL tương đối ('/api') chỉ chạy được khi có proxy cùng origin: dev server
@@ -92,43 +89,12 @@ async function fromBoot(args:string|FetchArgs):Promise<QueryResult|null>{
  */
 export interface MovieResponse{movie:Movie|null;importing?:ImportJob|null}
 
-/** Chỉ những đường dẫn thật sự đi ra nguồn ngoài mới cần biết nguồn ưu tiên. */
-const NEEDS_SOURCE=/^\/(catalog|provider|import)\b/;
-
 /**
- * Gắn `?source=` vào các request catalog theo nguồn đang chọn.
- *
- * Làm ở đây thay vì ở từng endpoint để không phải nhớ thêm tham số vào 12 chỗ gọi,
- * và để mọi endpoint thêm sau này tự động đúng. Đổi lại thì khoá cache của RTK
- * Query **không** thay đổi theo nguồn (khoá tính từ tham số endpoint, trước khi
- * hàm này chạy) — nên chỗ đổi nguồn phải gọi `cinemaApi.util.resetApiState()`,
- * xem `ui/pickers.tsx`.
- *
- * Dùng query param chứ không phải header riêng: header lạ khiến mọi GET
- * cross-origin phải preflight thêm một request OPTIONS, mà trang chủ gọi cả chục
- * endpoint catalog một lúc.
- *
- * Đây cũng là chỗ ghi lại nguồn **thật sự** trả lời (`noteAnswer`): mọi response
- * catalog đều mang theo `source` của resolver, nên bắt ở một chỗ rẻ hơn nhiều so
- * với việc luồn nó qua props của từng trang.
- *
- * Và là chỗ nhặt lại request đã bắn trước từ `index.html` (`fromBoot`) — phải nằm
- * sau đoạn gắn `?source=` ở trên, vì URL đem đi so khớp là URL cuối cùng.
+ * Nhặt lại request đã bắn trước từ `index.html` (`fromBoot`), rồi đi đường thường.
+ * Nguồn phim duy nhất là VSMOV nên không còn `?source=` hay ghi nhận nguồn trả lời.
  */
 const baseQuery:BaseQueryFn<string|FetchArgs,unknown,FetchBaseQueryError>=async(args,api,extra)=>{
-  const url=typeof args==='string'?args:args.url;
-  const external=NEEDS_SOURCE.test(url);
-  const source=sourceParam();
-  let request=args;
-  if(external&&source){
-    const next:FetchArgs=typeof args==='string'?{url:args}:{...args};
-    next.params={...(next.params as Record<string,unknown>|undefined),source};
-    request=next;
-  }
-  const result=(await fromBoot(request))??(await rawBaseQuery(request,api,extra));
-  // Ghi lại cả khi đang `auto` — nhất là khi đang `auto`, vì lúc đó lựa chọn của
-  // người dùng không nói được gì về nguồn nào đã trả lời.
-  if(external)noteAnswer(result.data);
+  const result=(await fromBoot(args))??(await rawBaseQuery(args,api,extra));
   return result;
 };
 
@@ -139,8 +105,6 @@ export const cinemaApi=createApi({
   endpoints:(builder)=>({
     getCatalog:builder.query<MovieList,CatalogQuery>({query:({kind,value,...params})=>({url:catalogUrl(kind,value),params})}),
     searchCatalog:builder.query<MovieList,{q:string;page?:number;limit?:number;type?:string;status?:string;year?:string}>({query:({q,...params})=>({url:'/catalog/search',params:{q,...params}})}),
-    // Trạng thái từng nguồn catalog: nguồn nào đang bị tạm ngừng, lỗi cuối là gì.
-    getProviders:builder.query<{sources:SourceHealth[];inactive:InactiveSource[];order:string[]},void>({query:()=>'/providers'}),
     getTaxonomy:builder.query<TaxonomyList,'genres'|'countries'|'years'|'actors'|'codes'>({query:(kind)=>`/catalog/${kind}`}),
     // Menu điều hướng đổi rất chậm — giữ cache 10 phút để không gọi lại mỗi lần đổi route.
     getNavigation:builder.query<Navigation,void>({query:()=>'/catalog/navigation',keepUnusedDataFor:600}),
@@ -171,9 +135,21 @@ export const cinemaApi=createApi({
     getFavorite:builder.query<{favorite:boolean},number>({query:(id)=>({url:`/favorites/${id}`,params:{deviceId}}),providesTags:(_r,_e,id)=>[{type:'Favorite',id}]}),
     setFavorite:builder.mutation<{favorite:boolean},{movieId:number;enabled:boolean}>({query:({movieId,enabled})=>({url:`/favorites/${movieId}`,method:'POST',body:{deviceId,enabled}}),invalidatesTags:(_r,_e,x)=>['Favorite',{type:'Favorite',id:x.movieId}]}),
     saveProgress:builder.mutation<any,{episodeId:number;position:number;duration:number;completed?:boolean}>({query:(body)=>({url:'/watch-progress',method:'POST',body:{...body,deviceId}}),invalidatesTags:['Progress']}),
-    getContinue:builder.query<{items:any[]},void>({query:()=>({url:'/continue-watching',params:{deviceId}}),providesTags:['Progress']})
+    getContinue:builder.query<{items:any[]},void>({query:()=>({url:'/continue-watching',params:{deviceId}}),providesTags:['Progress']}),
+    /**
+     * Tìm phụ đề ở nguồn ngoài. Chỉ gửi `episodeId`: tên phim, năm, imdb/tmdb id và số
+     * tập đều nằm trong DB của API, để web tự dựng câu truy vấn là mở đường cho hai
+     * phía lệch nhau — và mỗi lần lệch là một lần quota miễn phí bị đốt vô ích.
+     */
+    searchSubtitles:builder.query<SubtitleSearch,{episodeId:number;lang?:string;query?:string}>({query:({episodeId,...params})=>({url:'/subtitles/search',params:{episodeId,...params}})}),
+    // Tải thật thì mới tiêu quota, nên là mutation: không cache, không tự gọi lại.
+    fetchSubtitle:builder.mutation<SubtitleFile,{provider:string;id:string}>({query:(body)=>({url:'/subtitles/fetch',method:'POST',body})}),
+    /** Dán link .srt/.zip: phải đi qua API vì trình duyệt bị CORS chặn gần hết. */
+    fetchSubtitleUrl:builder.mutation<SubtitleFile,{url:string}>({query:(body)=>({url:'/subtitles/remote',method:'POST',body})})
   })
 });
 
-export const {useGetCatalogQuery,useSearchCatalogQuery,useGetProvidersQuery,useGetTaxonomyQuery,useGetNavigationQuery,useSearchAllQuery,useGetPeopleQuery,useGetPersonQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetImportStatusQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;
+export const {useGetCatalogQuery,useSearchCatalogQuery,useGetTaxonomyQuery,useGetNavigationQuery,useSearchAllQuery,useGetPeopleQuery,useGetPersonQuery,useGetMovieQuery,useGetLocalMoviesQuery,useGetLocalMovieQuery,useGetEpisodeQuery,useGetImportStatusQuery,useGetHealthQuery,useGetSyncQuery,useStartSyncMutation,useImportMovieMutation,useGetFavoritesQuery,useGetFavoriteQuery,useSetFavoriteMutation,useSaveProgressMutation,useGetContinueQuery}=cinemaApi;
+/** Tìm sub là hành động người xem bấm, không phải dữ liệu của trang → lazy. */
+export const {useLazySearchSubtitlesQuery,useFetchSubtitleMutation,useFetchSubtitleUrlMutation}=cinemaApi;
 export const {usePrefetch}=cinemaApi;

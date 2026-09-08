@@ -76,7 +76,7 @@ function bootScript() {
  * `base` để trống nghĩa là giả cảnh chưa đặt VITE_API_URL: Vite giữ nguyên chuỗi
  * `%…%` và script phải tự nhận ra rồi lùi về `/api`.
  */
-function runBoot(pathname, { base = API, saved = null } = {}) {
+function runBoot(pathname, { base = API } = {}) {
   // Thay biến bằng regex **global** trên toàn bộ nguồn, y hệt hook của Vite. Thay
   // bằng chuỗi thường chỉ trúng chỗ đầu tiên, nên nếu comment nhắc tới token thì
   // `var base` không được thay và test báo hỏng ở chỗ code hoàn toàn đúng.
@@ -86,7 +86,7 @@ function runBoot(pathname, { base = API, saved = null } = {}) {
   const scope = {
     window,
     location: { pathname, search: '', origin: ORIGIN },
-    localStorage: { getItem: () => saved },
+    localStorage: { getItem: () => null },
     fetch: (url) => {
       sent.push(url);
       return Promise.resolve({ status: 200, ok: true, text: () => Promise.resolve('{"ok":true}') });
@@ -149,24 +149,9 @@ test('trang xem: bắn tập TRƯỚC phim, và nhặt lại được cả hai',
   assert.ok(claim(queue, '/catalog/movies/tay-du-ky-2025'), 'getMovie(slug) phải khớp');
 });
 
-test('đã chọn nguồn: cả hai bên đều gắn ?source=, trừ /episodes', () => {
-  const { queue, sent } = runBoot('/watch/tay-du-ky-2025/4210', { saved: '  VsMov  ' });
-  // `/episodes` không khớp NEEDS_SOURCE trong api.ts nên baseQuery không gắn source;
-  // script cũng cố ý không bọc withSource() cho nó.
-  assert.deepEqual(sent, [`${API}/episodes/4210`, `${API}/catalog/movies/tay-du-ky-2025?source=vsmov`]);
-  assert.ok(claim(queue, '/episodes/4210'));
-  assert.ok(claim(queue, { url: '/catalog/movies/tay-du-ky-2025', params: { source: 'vsmov' } }));
-});
-
-test("nguồn 'auto' thì không gắn tham số nào", () => {
-  const { sent } = runBoot('/', { saved: 'AUTO' });
-  assert.equal(sent[0], `${API}/catalog/home?page=1&limit=24`);
-});
-
 test('thứ tự tham số khác nhau vẫn là cùng một request', () => {
-  const { queue } = runBoot('/', { saved: 'vsmov' });
-  // Script nối source vào cuối; api.ts xếp từ object nên source có thể ra trước.
-  assert.ok(claim(queue, { url: '/catalog/home', params: { source: 'vsmov', limit: 24, page: 1 } }));
+  const { queue } = runBoot('/');
+  assert.ok(claim(queue, { url: '/catalog/home', params: { limit: 24, page: 1 } }));
 });
 
 test('VITE_API_URL chưa đặt: cả hai bên lùi về /api', () => {

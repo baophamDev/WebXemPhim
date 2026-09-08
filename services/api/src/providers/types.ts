@@ -1,18 +1,8 @@
 /**
- * Hợp đồng giữa API và các nguồn catalog.
+ * Kiểu dữ liệu catalog — nguồn duy nhất là VSMOV.
  *
- * Ba thay đổi so với bản một-nguồn trước đây:
- *
- * 1. **Method là optional.** Không nguồn nào cũng có đủ 14 khả năng — TMDB không
- *    có "code phim", nguồn phát thì không có ảnh diễn viên chuẩn. Resolver bỏ qua
- *    nguồn thiếu method thay vì để nó ném lỗi ở runtime.
- * 2. **`kind` phân biệt nguồn phát được và nguồn chỉ có metadata.** Chỉ nguồn
- *    `playable` mới trả về được `episodes` để phát; nguồn `metadata` dùng để bồi
- *    thêm poster/rating/cast vào field còn trống.
- * 3. **Mọi method trả shape đã chuẩn hoá** (`ListPage`, `Taxonomy`,
- *    `SourceDetail`) chứ không phải payload thô của nguồn. Trước đây `detail()`
- *    trả thẳng JSON của vsmov nên tên field của vsmov rò rỉ vào tận `db.ts`;
- *    thêm nguồn thứ hai là phải bắt nguồn mới giả dạng vsmov.
+ * Mọi hàm trong `vsmov.ts` trả shape đã chuẩn hoá (`ListPage`/`Taxonomy`/
+ * `SourceDetail`) chứ không phải payload thô của nguồn.
  */
 
 export interface CatalogFilters {
@@ -24,21 +14,6 @@ export interface CatalogFilters {
   type?: string;
   status?: string;
 }
-
-/** `playable` phát được phim; `metadata` chỉ mô tả phim. */
-export type SourceKind = 'playable' | 'metadata';
-
-/**
- * Các chặng có thật bên trong `resolver.detail()`, theo đúng thứ tự nó chạy:
- * hỏi nguồn phát bằng slug → hỏi nguồn metadata → tìm lại nguồn phát bằng tên +
- * năm → bồi nốt các field còn trống. Hàng đợi nhập phim báo những tên này lên web
- * để bảng tiến trình nói được việc đang làm, thay vì một con số phần trăm bịa.
- */
-export type DetailStage = 'playable' | 'metadata' | 'rematch' | 'enrich';
-
-export type Capability =
-  | 'latest' | 'home' | 'list' | 'search' | 'genres' | 'byGenre' | 'countries'
-  | 'byCountry' | 'years' | 'byYear' | 'actors' | 'codes' | 'byCode' | 'detail';
 
 export interface Pagination {
   totalItems: number;
@@ -115,51 +90,8 @@ export interface SourceDetail {
   episodes: EpisodeGroup[];
 }
 
-/**
- * Một nguồn catalog. Chỉ `name` và `kind` là bắt buộc; phần còn lại tuỳ nguồn
- * làm được đến đâu, resolver tự dò bằng `typeof source[capability] === 'function'`.
- */
-export interface CatalogSource {
-  readonly name: string;
-  readonly kind: SourceKind;
-  latest?(page: number, limit?: number): Promise<ListPage>;
-  home?(filters?: CatalogFilters): Promise<ListPage>;
-  list?(slug: string, filters?: CatalogFilters): Promise<ListPage>;
-  search?(keyword: string, filters?: CatalogFilters): Promise<ListPage>;
-  genres?(): Promise<Taxonomy>;
-  byGenre?(slug: string, filters?: CatalogFilters): Promise<ListPage>;
-  countries?(): Promise<Taxonomy>;
-  byCountry?(slug: string, filters?: CatalogFilters): Promise<ListPage>;
-  years?(): Promise<Taxonomy>;
-  byYear?(year: string, filters?: CatalogFilters): Promise<ListPage>;
-  actors?(): Promise<Taxonomy>;
-  codes?(): Promise<Taxonomy>;
-  byCode?(code: string, filters?: CatalogFilters): Promise<ListPage>;
-  detail?(slug: string): Promise<SourceDetail>;
-}
-
-/** Trạng thái một nguồn, phục vụ `GET /api/providers`. */
-export interface SourceHealth {
-  name: string;
-  kind: SourceKind;
-  capabilities: Capability[];
-  healthy: boolean;
-  failures: number;
-  /** Thời điểm circuit đóng lại (ISO) — null nghĩa là đang mở cho request. */
-  openUntil: string | null;
-  lastError: string | null;
-  lastSuccessAt: string | null;
-}
-
-/**
- * Nguồn có tên trong hệ thống nhưng đang không dùng được: chưa có khoá API, hoặc
- * chưa viết adapter (MyDramaList). Trả về cho web để hiện mờ kèm lý do, thay vì
- * giấu đi — người dùng thấy "MyDramaList (chưa có API key)" thì hiểu ngay, còn
- * một danh sách ba nguồn mà chỉ hiện hai thì trông như lỗi.
- */
-export interface InactiveSource {
-  name: string;
-  kind: SourceKind;
-  /** Lý do nguồn chưa bật, viết cho người đọc chứ không phải mã lỗi. */
-  hint: string;
+/** Chi tiết một phim kèm danh sách tập phát được từ VSMOV. */
+export interface VsmovDetail extends SourceDetail {
+  /** Nguồn đã trả lời — luôn là `vsmov`, giữ để client hiển thị. */
+  source: string;
 }

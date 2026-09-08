@@ -42,12 +42,11 @@ test('cachedRoute: stale-while-revalidate luôn gấp 5 lần max-age', async ()
   }
 });
 
-test('cachedRoute: Vary phải có Origin và x-catalog-source', async () => {
+test('cachedRoute: Vary phải có Origin', async () => {
   // Origin: CORS trả Access-Control-Allow-Origin theo người gọi — thiếu Vary thì
   // cache chung đưa lại header của origin khác và trình duyệt chặn.
-  // x-catalog-source: preferredCatalog() cũng đọc header này (đường dành cho curl).
   const { res } = await run(cachedRoute(60, async () => ({})));
-  assert.equal(res.headers.Vary, 'Origin, x-catalog-source');
+  assert.equal(res.headers.Vary, 'Origin');
 });
 
 test('cachedRoute: handler ném lỗi thì KHÔNG có header cache nào', async () => {

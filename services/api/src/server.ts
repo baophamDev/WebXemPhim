@@ -11,8 +11,7 @@ import {
 import { describeFailure, shortCause } from './errors.js';
 import { asyncRoute, cachedRoute } from './http.js';
 import { forgetImport, importJob, importQueueSize, startImport, waitForImport, type ImportJob, type Report } from './importer.js';
-import { catalog, inactiveSources, type CatalogFilters } from './providers/index.js';
-import { streamRouter } from './stream.js';
+import { catalog, type CatalogFilters } from './providers/index.js';
 import { slugifyName } from './text.js';
 import { syncLatest } from './sync.js';
 
@@ -57,45 +56,15 @@ const slugSchema = z.string().trim().min(1).max(160).regex(/^[a-zA-Z0-9._-]+$/);
 const idSchema = z.coerce.number().int().positive();
 const queryFilters = (query: express.Request['query']) => filtersSchema.parse(query) as CatalogFilters;
 
-const sourceNameSchema = z.string().trim().max(40).regex(/^[A-Za-z0-9_-]+$/, 'tên nguồn chỉ gồm chữ, số, - và _');
-
 /**
- * Nguồn ưu tiên cho **request này**, không phải cho cả tiến trình.
+ * Nhập một phim từ VSMOV vào DB.
  *
- * Đọc từ `?source=` (web gửi kiểu này) hoặc header `x-catalog-source` (tiện cho
- * curl khi soi lỗi). Query param là đường chính có lý do: web ở Vercel gọi API ở
- * Railway là cross-origin, mà header lạ thì mọi GET catalog đều phải preflight
- * thêm một round-trip — đổi nguồn không đáng giá gấp đôi số request.
- *
- * `auto` hoặc không truyền gì thì dùng đúng thứ tự `CATALOG_SOURCES`. Tên không có
- * trong danh sách nguồn đang bật thì `prefer()` ném 400 — im lặng bỏ qua sẽ khiến
- * người dùng tưởng đã đổi nguồn trong khi vẫn đang xem nguồn cũ.
- *
- * `filtersSchema` bỏ khoá lạ nên `?source=` không lọt vào filter của nguồn.
+ * `report` để job ở nền kể lại việc đang làm. `catalog.detail()` báo chặng
+ * `loading`, còn `saving` là chặng duy nhất thuộc về hàm này, và nó báo
+ * *trước* khi ghi DB nên chặng hiện lên là chặng đang chờ.
  */
-function preferredCatalog(req: express.Request) {
-  const raw = (typeof req.query.source === 'string' ? req.query.source : '') || req.get('x-catalog-source') || '';
-  const wanted = raw.trim();
-  if (!wanted || wanted.toLowerCase() === 'auto') return catalog;
-  return catalog.prefer(sourceNameSchema.parse(wanted));
-}
-
-/**
- * Nhập một phim từ các nguồn vào DB. Resolver ghép nguồn phát với nguồn metadata
- * (xem `providers/resolver.ts`), nên bản ghi lưu xuống đã đầy đủ nhất có thể ở
- * thời điểm nhập, không phải chờ lần sửa tay nào.
- *
- * `resolver` truyền vào để tôn trọng nguồn người dùng đang chọn: đứng ở catalog
- * TVDB bấm vào một phim thì phim đó nên được hỏi TVDB trước. Thứ tự "nguồn phát
- * trước" bên trong `detail()` vẫn giữ nguyên, nên chọn nguồn metadata không làm
- * mất nút play.
- * `report` để job ở nền kể lại việc đang làm. `resolver.detail()` nhận đúng kiểu
- * này vì `DetailStage` là tập con của `ImportStage`; `saving` là chặng duy nhất
- * thuộc về hàm này, và nó báo *trước* khi ghi DB nên chặng hiện lên là chặng đang
- * chờ.
- */
-async function importDetail(slug: string, resolver = catalog, report?: Report) {
-  const detail = await resolver.detail(slug, report);
+async function importDetail(slug: string, report?: Report) {
+  const detail = await catalog.detail(slug, (stage, source) => report?.(stage, source));
   report?.('saving', detail.source);
   const movieId = await upsertMovie(detail.movie);
   await upsertEpisodes(movieId, detail.episodes);
@@ -106,8 +75,8 @@ async function importDetail(slug: string, resolver = catalog, report?: Report) {
  * Mở (hoặc gặp lại) job nhập phim ở nền cho `slug`. Không await: chỗ gọi trả lời
  * client ngay với trạng thái job, còn việc kéo dữ liệu tiếp tục chạy.
  */
-function queueImport(slug: string, resolver = catalog): ImportJob {
-  return startImport(slug, (report) => importDetail(slug, resolver, report));
+function queueImport(slug: string): ImportJob {
+  return startImport(slug, (report) => importDetail(slug, report));
 }
 
 /**
@@ -127,7 +96,7 @@ async function respondWithMovie(req: express.Request, res: express.Response, slu
   if (saved) return res.json({ movie: saved });
 
   const wait = req.query.wait === '1' || req.query.wait === 'true';
-  const job = queueImport(slug, preferredCatalog(req));
+  const job = queueImport(slug);
   if (!wait) {
     if (job.stage !== 'failed') return res.status(202).json({ movie: null, importing: job });
     forgetImport(slug);
@@ -145,8 +114,8 @@ async function respondWithMovie(req: express.Request, res: express.Response, slu
 }
 
 /**
- * Provider là nguồn duy nhất có ảnh diễn viên, nhưng gọi mỗi request thì chậm.
- * Ghép ảnh vào bảng people tối đa 1 lần/giờ, và lỗi provider thì bỏ qua im lặng
+ * VSMOV là nguồn duy nhất có ảnh diễn viên, nhưng gọi mỗi request thì chậm.
+ * Ghép ảnh vào bảng people tối đa 1 lần/giờ, và lỗi nguồn thì bỏ qua im lặng
  * — thiếu ảnh không phải lý do để trang diễn viên trả lỗi.
  */
 let thumbsSyncedAt = 0;
@@ -163,7 +132,7 @@ async function refreshPeopleThumbs() {
 }
 
 /**
- * Taxonomy ưu tiên nguồn ngoài (có slug chuẩn để gọi tiếp), mọi nguồn chết thì
+ * Taxonomy ưu tiên VSMOV (có slug chuẩn để gọi tiếp), VSMOV chết thì
  * dựng từ DB để menu điều hướng không bao giờ trắng.
  */
 async function taxonomyWithFallback(
@@ -172,9 +141,9 @@ async function taxonomyWithFallback(
 ) {
   try {
     const remote = await fromProvider();
-    if (remote.items.length) return { source: 'provider', items: remote.items };
+    if (remote.items.length) return { source: 'vsmov', items: remote.items };
   } catch (error) {
-    console.warn('Taxonomy không có nguồn nào trả lời, chuyển sang DB:', (error as Error).message);
+    console.warn('VSMOV không trả lời taxonomy, chuyển sang DB:', (error as Error).message);
   }
   const rows = await fromDb();
   return {
@@ -196,20 +165,6 @@ export const dbState = { ready: false, reason: null as string | null };
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-cinema-api', sources: catalog.names, database: dbState.ready ? 'ready' : 'connecting', databaseError: dbState.reason, imports: importQueueSize(), time: new Date().toISOString() }));
 
 /**
- * Trạng thái từng nguồn: nguồn nào đang bị circuit breaker tạm ngừng, lỗi cuối là
- * gì, làm được những gì. Khi web thiếu poster hay danh sách trống, đây là chỗ đầu
- * tiên cần xem — trước khi đi đọc log.
- *
- * `inactive` là các nguồn có tên nhưng chưa dùng được (thiếu khoá, chưa có
- * adapter). Bộ chọn nguồn ở web hiện chúng mờ kèm `hint` thay vì giấu đi.
- */
-app.get('/api/providers', (_req, res) => res.json({
-  sources: catalog.status(),
-  inactive: inactiveSources(),
-  order: catalog.names
-}));
-
-/**
  * Danh sách phim và taxonomy đều là dữ liệu chung, không cá nhân hoá, và đổi vài
  * lần một giờ là nhiều. Cho trình duyệt giữ lại một lúc: lần mở lại (F5, back,
  * hay mở lại app trên TV) không phải chờ nguồn ngoài trả lời lần nữa.
@@ -222,29 +177,28 @@ app.get('/api/providers', (_req, res) => res.json({
  * "đang nhập" (cache lại là đóng băng đúng cái đang chạy), còn `/api/movies` với
  * `/api/search` đọc DB của mình nên vốn đã nhanh.
  */
-app.get('/api/catalog/home', cachedRoute(60, (req) => preferredCatalog(req).home(queryFilters(req.query))));
-app.get('/api/catalog/lists/:slug', cachedRoute(60, (req) => preferredCatalog(req).listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query))));
-app.get('/api/catalog/search', cachedRoute(30, (req) => preferredCatalog(req).search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
-app.get('/api/catalog/genres', cachedRoute(600, (req) => taxonomyWithFallback(() => preferredCatalog(req).genres(), listGenresFromDb)));
-app.get('/api/catalog/genres/:slug', cachedRoute(60, (req) => preferredCatalog(req).byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query))));
-app.get('/api/catalog/countries', cachedRoute(600, (req) => taxonomyWithFallback(() => preferredCatalog(req).countries(), listCountriesFromDb)));
-app.get('/api/catalog/countries/:slug', cachedRoute(60, (req) => preferredCatalog(req).byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query))));
-app.get('/api/catalog/years', cachedRoute(600, (req) => taxonomyWithFallback(() => preferredCatalog(req).years(), listYearsFromDb)));
-app.get('/api/catalog/years/:year', cachedRoute(60, (req) => preferredCatalog(req).byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query))));
+app.get('/api/catalog/home', cachedRoute(60, (req) => catalog.home(queryFilters(req.query))));
+app.get('/api/catalog/lists/:slug', cachedRoute(60, (req) => catalog.listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/search', cachedRoute(30, (req) => catalog.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
+app.get('/api/catalog/genres', cachedRoute(600, () => taxonomyWithFallback(() => catalog.genres(), listGenresFromDb)));
+app.get('/api/catalog/genres/:slug', cachedRoute(60, (req) => catalog.byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/countries', cachedRoute(600, () => taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb)));
+app.get('/api/catalog/countries/:slug', cachedRoute(60, (req) => catalog.byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/years', cachedRoute(600, () => taxonomyWithFallback(() => catalog.years(), listYearsFromDb)));
+app.get('/api/catalog/years/:year', cachedRoute(60, (req) => catalog.byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query))));
 
 // Một request cho toàn bộ menu điều hướng, thay vì 3 request song song lúc mở trang.
-app.get('/api/catalog/navigation', cachedRoute(600, async (req) => {
-  const resolver = preferredCatalog(req);
+app.get('/api/catalog/navigation', cachedRoute(600, async () => {
   const [genres, countries, years] = await Promise.all([
-    taxonomyWithFallback(() => resolver.genres(), listGenresFromDb),
-    taxonomyWithFallback(() => resolver.countries(), listCountriesFromDb),
-    taxonomyWithFallback(() => resolver.years(), listYearsFromDb)
+    taxonomyWithFallback(() => catalog.genres(), listGenresFromDb),
+    taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb),
+    taxonomyWithFallback(() => catalog.years(), listYearsFromDb)
   ]);
   return { genres: genres.items, countries: countries.items, years: years.items };
 }));
 
-app.get('/api/catalog/codes', cachedRoute(600, (req) => preferredCatalog(req).codes()));
-app.get('/api/catalog/codes/:code', cachedRoute(60, (req) => preferredCatalog(req).byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query))));
+app.get('/api/catalog/codes', cachedRoute(600, () => catalog.codes()));
+app.get('/api/catalog/codes/:code', cachedRoute(60, (req) => catalog.byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query))));
 app.get('/api/catalog/movies/:slug', asyncRoute(async (req, res) => { await respondWithMovie(req, res, slugSchema.parse(req.params.slug)); }));
 
 const moviesQuerySchema = z.object({
@@ -360,7 +314,7 @@ app.post('/api/sync/start', asyncRoute(async (req, res) => {
  */
 app.post('/api/import/:slug', asyncRoute(async (req, res) => {
   const slug = slugSchema.parse(req.params.slug);
-  queueImport(slug, preferredCatalog(req));
+  queueImport(slug);
   try {
     await waitForImport(slug);
   } finally {
@@ -368,12 +322,8 @@ app.post('/api/import/:slug', asyncRoute(async (req, res) => {
   }
   res.json({ movie: await getMovie(slug, true) });
 }));
-// Tìm trực tiếp ở nguồn ngoài, bỏ qua kho đã lưu. Alias `/api/vsmov/search` của
-// bản một-nguồn đã bỏ: tên nguồn không còn nằm trong đường dẫn nữa.
-app.get('/api/provider/search', asyncRoute(async (req, res) => res.json(await preferredCatalog(req).search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
-
-// Playlist HLS đã bóc quảng cáo của nguồn — xem docs/ads.md.
-app.use('/api/stream', streamRouter);
+// Tìm trực tiếp ở VSMOV, bỏ qua kho đã lưu.
+app.get('/api/provider/search', asyncRoute(async (req, res) => res.json(await catalog.search(z.string().trim().min(2).parse(req.query.q), queryFilters(req.query)))));
 
 /**
  * Chỉ chỗ này quyết định client đọc được gì; luật nằm ở `errors.ts`. `ref` là sợi

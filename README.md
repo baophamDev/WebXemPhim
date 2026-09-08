@@ -29,8 +29,6 @@ apps/web/src/chunks.ts    Chunk nạp lười + hâm nóng trước khi bấm
 services/api/             Backend Express
 services/api/src/db.ts    Kết nối PostgreSQL
 services/api/src/http.ts  Vỏ bọc route: bắt lỗi async, Cache-Control cho route chỉ đọc
-services/api/src/hls.ts   Bộ lọc quảng cáo trong playlist m3u8
-services/api/src/stream.ts Proxy playlist đã bóc quảng cáo cho player
 services/api/src/importer.ts Hàng đợi nhập phim chạy ở nền
 services/api/src/providers/ Tầng nguồn catalog (nhiều nguồn, có fallback)
 supabase/migrations/      Schema PostgreSQL
@@ -40,13 +38,13 @@ railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
 
-Nguồn catalog là **một tầng nhiều nguồn có thứ tự ưu tiên** (`CATALOG_SOURCES`), không phải một nguồn duy nhất: nguồn đầu lỗi thì tự rơi xuống nguồn sau, và các nguồn `metadata` (TMDB, TheTVDB) bồi vào chỗ trống của nguồn `playable` (VSMOV). Người xem đổi được nguồn ưu tiên ngay trên header, xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
+Nguồn catalog là **một tầng nhiều nguồn có thứ tự ưu tiên** (`CATALOG_SOURCES`), không phải một nguồn duy nhất: nguồn đầu lỗi thì tự rơi xuống nguồn sau, các nguồn web đọc theo slug bổ sung link tập, và các nguồn `metadata` (TMDB, TheTVDB) bồi vào chỗ trống. Người xem đổi được nguồn ưu tiên ngay trên header, xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
 
 Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn việc kéo dữ liệu về chạy ở nền và có thanh tiến trình riêng — mục [12](#12-mở-một-phim-chưa-có-trong-db).
 
 App cho TV LG là **hosted web app**: file `.ipk` chỉ chứa `appinfo.json` + icon, còn nội dung lấy thẳng từ domain Vercel. Nghĩa là sửa web chỉ cần `git push`, không đóng gói lại. Hướng dẫn đầy đủ ở [docs/webos.md](docs/webos.md).
 
-Playlist của nguồn có quảng cáo chèn sẵn; API dựng lại playlist đã bóc quảng cáo trước khi giao cho player, chi tiết ở [docs/ads.md](docs/ads.md).
+Player dùng trực tiếp link HLS hoặc trang nhúng mà nguồn trả về; API không proxy hay chỉnh sửa playlist, nên request phát không phải đi qua thêm một chặng xử lý.
 
 Trang chủ và trang xem **không chờ bundle JS rồi mới hỏi API**: `index.html` bắn trước request của đúng route đang mở ngay lúc trình duyệt còn đọc HTML, còn chunk trang chi tiết/trang xem được kéo về từ `pointerdown`. Cách làm và những chỗ dễ làm nó im lặng vô hiệu ở [docs/prefetch.md](docs/prefetch.md).
 
@@ -150,7 +148,7 @@ Trong Railway service, mở **Variables** và thêm từng biến:
 DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
-CATALOG_SOURCES=vsmov,tmdb,tvdb
+CATALOG_SOURCES=vsmov,motchillu,motchillv,phim4k,phimmoichill,phimmoichill-win,vieflix,tmdb,tvdb
 VSMOV_API_URL=https://vsmov.com/api
 TMDB_ACCESS_TOKEN=token-v4-cua-themoviedb
 TMDB_LANGUAGE=vi-VN
@@ -167,7 +165,7 @@ Giải thích:
 | `DATABASE_URL` | Kết nối PostgreSQL Supabase |
 | `DATABASE_SSL` | Bật SSL khi kết nối Supabase |
 | `DATABASE_POOL_SIZE` | Số connection tối đa của một API instance |
-| `CATALOG_SOURCES` | Danh sách nguồn catalog, **thứ tự là ưu tiên** (`vsmov,tmdb,tvdb`) |
+| `CATALOG_SOURCES` | Danh sách nguồn catalog, **thứ tự là ưu tiên**. Sáu nguồn web dùng slug được bật mặc định sau VSMOV |
 | `VSMOV_API_URL` | Base URL của nguồn VSMOV |
 | `TMDB_ACCESS_TOKEN` | Token v4 của TMDB. Không có thì dùng `TMDB_API_KEY` (khoá v3); không có cả hai thì nguồn tmdb tự tắt |
 | `TMDB_LANGUAGE` | Ngôn ngữ metadata TMDB, mặc định `vi-VN` |
@@ -177,7 +175,7 @@ Giải thích:
 | `TVDB_COUNTRIES` | Các nước mà trang danh sách TVDB gộp lại, mặc định `chn,kor,jpn` |
 | `WEB_ORIGIN` | Những frontend domain được phép gọi API bằng trình duyệt |
 | `HOST` | Cho phép Railway truy cập Express server |
-| `STREAM_SECRET` | Tuỳ chọn: khoá ký link playlist con của bộ lọc quảng cáo ([docs/ads.md](docs/ads.md)) |
+| `SOURCE_<NAME>_URL` | Tuỳ chọn: thay domain của nguồn web tương ứng khi nguồn đổi địa chỉ |
 
 `CATALOG_PROVIDER` của bản cũ vẫn được đọc nếu chưa có `CATALOG_SOURCES`, nhưng nên đổi sang tên mới.
 
@@ -362,7 +360,7 @@ HOST=0.0.0.0
 WEB_ORIGIN=http://localhost:5173
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=5
-CATALOG_SOURCES=vsmov,tmdb,tvdb
+CATALOG_SOURCES=vsmov,motchillu,motchillv,phim4k,phimmoichill,phimmoichill-win,vieflix,tmdb,tvdb
 VSMOV_API_URL=https://vsmov.com/api
 ```
 
@@ -409,7 +407,7 @@ npm run lint
 npm run build
 ```
 
-`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của bộ lọc quảng cáo m3u8, của tầng nguồn catalog (resolver, TMDB, TheTVDB), của hàng đợi nhập phim, của header cache (`services/api/test/http.test.js`) và của phép khớp URL bắn trước (`apps/web/test/boot.test.mjs`) — tất cả trên dữ liệu tự dựng, không cần mạng, khoá API hay database. Adapter nào cần khoá thì test tự đặt khoá giả và thay `globalThis.fetch`, nên CI không có bí mật nào vẫn chạy đủ.
+`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của tầng nguồn catalog (resolver, các adapter HTML theo slug, TMDB, TheTVDB), của hàng đợi nhập phim, của header cache (`services/api/test/http.test.js`) và của phép khớp URL bắn trước (`apps/web/test/boot.test.mjs`) — tất cả trên dữ liệu tự dựng, không cần mạng, khoá API hay database. Adapter nào cần khoá thì test tự đặt khoá giả và thay `globalThis.fetch`, nên CI không có bí mật nào vẫn chạy đủ.
 
 `npm run lint` dùng ESLint 9 với cấu hình ở [eslint.config.mjs](eslint.config.mjs) — một file cho cả hai workspace. Cảnh báo (`warn`) không làm lệnh thất bại, chỉ lỗi (`error`) mới. `npm run lint:fix` sửa những gì sửa được tự động.
 
@@ -437,6 +435,7 @@ normalize.ts  Chuẩn hoá + kiểm tra shape ở biên, khớp phim giữa hai 
 http.ts       fetch dùng chung: timeout, cache theo TTL
 resolver.ts   Chọn nguồn, fallback, circuit breaker, bồi metadata
 vsmov.ts      Nguồn playable (có link tập)
+web.ts        Sáu nguồn web playable, đọc trang phim theo slug
 tmdb.ts       Nguồn metadata (không có link tập)
 tvdb.ts       Nguồn metadata thứ hai (TheTVDB v4, mạnh về phim bộ châu Á)
 index.ts      Đăng ký nguồn, đọc CATALOG_SOURCES
@@ -446,7 +445,7 @@ Hai loại nguồn khác nhau ở chỗ được phép trả gì:
 
 | Loại | Ví dụ | Được dùng cho |
 | --- | --- | --- |
-| `playable` | vsmov | Danh sách, tìm kiếm, **và link tập** |
+| `playable` | vsmov, các nguồn web slug | VSMOV cung cấp catalog; các nguồn web bổ sung link tập theo slug |
 | `metadata` | tmdb, tvdb | Chỉ lấp chỗ trống: poster, mô tả, năm, điểm, diễn viên |
 
 MyDramaList (`mdl`) có tên trong bảng nguồn nhưng chưa có adapter — API của họ chưa mở công khai. Nó hiện mờ trong danh sách nguồn kèm lý do thay vì bị giấu đi, vì một danh sách thiếu tên trông như lỗi.
@@ -516,7 +515,7 @@ GET /api/providers
   "inactive": [
     { "name": "mdl", "kind": "metadata", "hint": "MyDramaList chưa mở API công khai — cần xin khoá ở mydramalist.com/api_request" }
   ],
-  "order": ["vsmov", "tmdb", "tvdb"]
+  "order": ["vsmov", "motchillu", "motchillv", "phim4k", "phimmoichill", "phimmoichill-win", "vieflix", "tmdb", "tvdb"]
 }
 ```
 

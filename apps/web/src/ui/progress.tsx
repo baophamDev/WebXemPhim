@@ -1,15 +1,10 @@
 /**
  * Tiến trình "tải phim" và thanh tiến trình chung trên đỉnh trang.
  *
- * Vì sao cần: mở một phim chưa từng xem thì API phải đi qua nhiều nguồn ngoài, mỗi
- * nguồn có thể mất vài giây. Trước đây web đứng im trong lúc đó — người dùng bấm
- * vào poster rồi ngồi nhìn một vòng xoay, không biết web còn sống hay không. Giờ
- * việc kéo dữ liệu chạy ở nền và chỗ này kể lại nó đang làm gì.
- *
- * Các chặng hiện ra là chặng **thật** của resolver ở API (hỏi nguồn phát → hỏi
- * nguồn thông tin → khớp phim giữa các nguồn → bồi metadata → lưu), không phải một
- * con số phần trăm bịa ra cho đẹp. Một người chờ 15 giây mà đọc được "đang hỏi
- * tvdb" thì biết web đang làm việc; một thanh chạy giả thì lần sau họ không tin nữa.
+ * Vì sao cần: mở một phim chưa từng xem thì API phải hỏi VSMOV, có thể mất vài
+ * giây. Trước đây web đứng im trong lúc đó — người dùng bấm vào poster rồi ngồi
+ * nhìn một vòng xoay, không biết web còn sống hay không. Giờ việc kéo dữ liệu
+ * chạy ở nền và chỗ này kể lại nó đang làm gì.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -22,10 +17,7 @@ const POLL_MS = 1_500;
 /** Nhãn tiếng Việt cho từng chặng, viết theo việc đang làm chứ không theo tên hàm. */
 const STAGE_LABEL: Record<ImportStage, string> = {
   queued: 'Đang xếp hàng',
-  playable: 'Đang hỏi nguồn phát',
-  metadata: 'Đang hỏi nguồn thông tin',
-  rematch: 'Đang khớp phim giữa các nguồn',
-  enrich: 'Đang bồi thêm thông tin',
+  loading: 'Đang tải từ VSMOV',
   saving: 'Đang lưu vào kho',
   ready: 'Đã xong',
   failed: 'Không tải được'
@@ -37,10 +29,10 @@ const STAGE_LABEL: Record<ImportStage, string> = {
  * Chặng cuối dừng ở 90 để thanh không đầy trước khi việc xong thật.
  */
 const STAGE_PERCENT: Record<ImportStage, number> = {
-  queued: 6, playable: 26, metadata: 44, rematch: 60, enrich: 76, saving: 90, ready: 100, failed: 100
+  queued: 6, loading: 45, saving: 90, ready: 100, failed: 100
 };
 
-const ORDER: ImportStage[] = ['queued', 'playable', 'metadata', 'rematch', 'enrich', 'saving'];
+const ORDER: ImportStage[] = ['queued', 'loading', 'saving'];
 
 export interface ImportProgress {
   job: ImportJob | null;

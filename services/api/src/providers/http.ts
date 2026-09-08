@@ -1,5 +1,5 @@
 /**
- * Lớp gọi HTTP dùng chung cho các adapter nguồn: timeout, cache theo TTL, và một
+ * Lớp gọi HTTP cho nguồn VSMOV: timeout, cache theo TTL, và một
  * thông điệp lỗi thống nhất.
  *
  * Cache là in-memory có giới hạn số khoá. Không dùng `Map` không giới hạn như bản
@@ -21,15 +21,11 @@ export interface FetchOptions {
 }
 
 export function cacheKey(url: string, headers?: Record<string, string>) {
-  // Ngôn ngữ/khoá API nằm ở header hoặc query của từng nguồn nên phải vào khoá,
-  // nếu không đổi TMDB_LANGUAGE mà cache vẫn trả bản cũ.
   return headers?.['accept-language'] ? `${url}|${headers['accept-language']}` : url;
 }
 
 /**
- * Mã HTTP thật của nguồn, đọc lại từ lỗi mà `getJson`/`postJson` ném ra. Bên ngoài
- * chỉ thấy 502/504 (đó là mã mà API này trả cho client), nhưng adapter cần biết
- * nguồn trả 401 để đi lấy token mới rồi thử lại — xem `tvdb.ts`.
+ * Mã HTTP thật của VSMOV, đọc lại từ lỗi mà `getJson`/`postJson` ném ra.
  */
 export function upstreamStatus(error: unknown): number | null {
   const status = (error as { upstreamStatus?: unknown })?.upstreamStatus;
@@ -67,6 +63,37 @@ async function send<T>(
   }
 }
 
+async function sendText(
+  url: string,
+  options: FetchOptions
+): Promise<string> {
+  const { source, timeoutMs = 20_000, headers } = options;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+        'user-agent': 'BaoNhanCinema/0.3',
+        ...headers
+      }
+    });
+    if (!response.ok) {
+      const failure = httpError(502, `Nguồn ${source} trả HTTP ${response.status}`) as Error & { upstreamStatus?: number };
+      failure.upstreamStatus = response.status;
+      throw failure;
+    }
+    return await response.text();
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') throw httpError(504, `Nguồn ${source} không trả lời sau ${Math.round(timeoutMs / 1000)}s`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function getJson<T = unknown>(url: string, options: FetchOptions): Promise<T> {
   const { ttlMs = 120_000, headers } = options;
   const key = cacheKey(url, headers);
@@ -82,10 +109,23 @@ export async function getJson<T = unknown>(url: string, options: FetchOptions): 
   return value;
 }
 
+export async function getText(url: string, options: FetchOptions): Promise<string> {
+  const { ttlMs = 120_000, headers } = options;
+  const key = cacheKey(url, headers);
+  const cached = cache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.value as string;
+
+  const value = await sendText(url, options);
+  if (cache.size >= CACHE_LIMIT) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, { expires: Date.now() + ttlMs, value });
+  return value;
+}
+
 /**
- * POST JSON, **không** cache. Chỉ dành cho endpoint không phải đọc dữ liệu — hiện
- * tại là đăng nhập lấy token của TVDB. Cache một lần đăng nhập theo URL sẽ giữ lại
- * cả token cũ đã hết hạn, mà việc đó adapter tự quản lý tốt hơn.
+ * POST JSON, **không** cache. Chỉ dành cho endpoint không phải đọc dữ liệu.
  */
 export function postJson<T = unknown>(url: string, body: unknown, options: FetchOptions): Promise<T> {
   return send<T>(url, {

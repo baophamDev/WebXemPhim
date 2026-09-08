@@ -48,18 +48,6 @@
         if (!base || base.charAt(0) === '%') base = '/api';
         base = base.replace(/\/+$/, '');
 
-        // Nguồn ưu tiên: cùng khoá và cùng cách chuẩn hoá với src/source.ts.
-        var source = '';
-        try {
-          var saved = localStorage.getItem('cinema-source');
-          saved = saved ? saved.replace(/^\s+|\s+$/g, '').toLowerCase() : '';
-          if (saved && saved !== 'auto') source = 'source=' + encodeURIComponent(saved);
-        } catch (e) { /* chặn storage thì coi như đang ở 'auto' */ }
-        function withSource(url) {
-          if (!source) return url;
-          return url + (url.indexOf('?') < 0 ? '?' : '&') + source;
-        }
-
         var queue = [];
         function grab(url) {
           var reply = fetch(url).then(function (res) {
@@ -88,15 +76,15 @@
           // màn hình đầu — bắn cả năm ở đây thì chúng giành băng thông với chính
           // cái bundle đang cần về sớm. page/limit phải khớp useGetCatalogQuery
           // trong src/pages/Home.tsx.
-          grab(withSource(base + '/catalog/home?page=1&limit=24'));
+          grab(base + '/catalog/home?page=1&limit=24');
         } else if (movie) {
-          grab(withSource(base + '/catalog/movies/' + seg(movie[1])));
+          grab(base + '/catalog/movies/' + seg(movie[1]));
         } else if (watch) {
           // Tập trước phim: /episodes/:id đọc một dòng và là thứ quyết định lúc
           // khung hình đầu tiên hiện ra; /catalog/movies/:slug còn phải join
           // phim + tập + người để dựng tiêu đề với danh sách tập.
           grab(base + '/episodes/' + watch[2]);
-          grab(withSource(base + '/catalog/movies/' + seg(watch[1])));
+          grab(base + '/catalog/movies/' + seg(watch[1]));
         }
         if (queue.length) window.__BOOT__ = queue;
       })();

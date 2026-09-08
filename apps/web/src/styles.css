@@ -94,38 +94,77 @@
    trạng thái hover. Nên bản sáng hạ nó xuống nâu-hổ phách, và --on-amber (chữ
    nằm *trên* nền vàng) lật ngược thành màu kem. */
 :root[data-theme='light'] {
-  --void: #faf6f0;
-  --carbon: #f3ece2;
-  --slab: #ece2d5;
-  --slab-2: #e2d5c4;
+  /* Daylight cyberpunk: giấy cát ấm + neon hổ phách giữ nguyên độ vivid.
+     Nền cố ý tối hơn bản cũ (#faf6f0 -> #f1e7d3) để ảnh và panel kính không bị
+     cháy sáng; chữ dùng nâu espresso để giữ tương phản mà không thành đen tuyệt. */
+  --void: #f1e7d3;
+  --carbon: #e9dcc4;
+  --slab: #e0d0b4;
+  --slab-2: #d5c2a1;
 
-  --edge: #dbcdba;
-  --edge-hi: #bfa88d;
-  --track: #c9b49b;
+  --edge: #c9b48f;
+  --edge-hi: #a38052;
+  --track: #b39a6f;
 
-  --ink: #1f150e;
-  --ink-dim: #5b4636;
+  --ink: #241708;
+  --ink-dim: #5c452c;
   /* 4.6:1 trên --void — vẫn là ngưỡng cho nhãn 11px như bản tối. */
-  --ink-faint: #7a6350;
+  --ink-faint: #7c6547;
 
-  --amber: #b45309;
-  --ember: #c2410c;
-  --gold: #8f4a0a;
-  --on-amber: #fff8ec;
+  /* Neon ban ngày: giữ cam cháy + vàng hổ phách rực thay vì nâu xỉn, để nút,
+     viền focus, đèn trạng thái vẫn "điện" trên nền giấy. */
+  --amber: #d97706;
+  --ember: #ea580c;
+  --gold: #b45309;
+  --chrome: linear-gradient(100deg, #ea580c, #f59e0b 55%, #fbbf24);
+  --on-amber: #241100;
   --warn: #9a3412;
   --ok: #157f52;
 
-  --glass: rgba(255, 251, 245, .74);
-  --glass-edge: rgba(180, 83, 9, .2);
+  --glass: rgba(241, 231, 211, .82);
+  --glass-edge: rgba(194, 87, 11, .38);
 
-  --page: #e5dbcb;
-  --veil: 250 245 237;
-  --tint: rgba(31, 21, 14, .05);
-  --tint-soft: rgba(31, 21, 14, .035);
-  --title-shadow: rgba(255, 252, 246, .8);
-  --scan: rgba(146, 64, 14, .07);
-  --backdrop: rgba(43, 30, 18, .42);
+  --page: #cdbb9c;
+  --veil: 241 231 211;
+  --tint: rgba(36, 23, 8, .06);
+  --tint-soft: rgba(36, 23, 8, .045);
+  --title-shadow: rgba(36, 23, 8, .28);
+  --scan: rgba(146, 64, 14, .09);
+  --backdrop: rgba(43, 30, 18, .44);
   color-scheme: light;
+}
+
+/* Hero và đầu trang chi tiết là "sân khấu tối" trong cả hai chế độ: chữ và panel
+   nằm TRÊN ảnh phim nên phải dùng token tối để đọc được, dù phần còn lại của
+   trang đang là giấy sáng. Không làm vậy thì lớp phủ sáng sẽ giặt ảnh thành
+   trắng sữa (đúng lỗi đang thấy ở light mode). Khai lại token ngay trên khối
+   hero là cả cây con đi theo, không cần nhân bản quy tắc. */
+:root[data-theme='light'] .hero,
+:root[data-theme='light'] .detail-hero {
+  --void: #0b0806;
+  --carbon: #14100b;
+  --slab: #1b1310;
+  --slab-2: #241a14;
+  --edge: #3a2c20;
+  --edge-hi: #6b4c33;
+  --track: #6b503c;
+  --ink: #f7f0e7;
+  --ink-dim: #e3d3bd;
+  --ink-faint: #c2a87f;
+  --amber: #ffc53d;
+  --ember: #ff6a1f;
+  --gold: #ffdf9e;
+  --chrome: linear-gradient(100deg, var(--ember), var(--amber) 62%, var(--gold));
+  --on-amber: #17110a;
+  --warn: #ff9f1a;
+  --glass: rgba(20, 13, 8, .68);
+  --glass-edge: rgba(255, 197, 61, .28);
+  --veil: 11 8 6;
+  --tint: rgba(255, 255, 255, .08);
+  --tint-soft: rgba(255, 255, 255, .05);
+  --title-shadow: rgba(0, 0, 0, .65);
+  --scan: rgba(255, 197, 61, .1);
+  color-scheme: dark;
 }
 
 /* Trang xem phim là hòn đảo tối trong cả hai chế độ: khung của trình phát phải
@@ -188,13 +227,28 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: up
 /* Không còn `fixed`: thanh trên nằm trong khung bo góc, và trên trang có hero
    thì nó nổi lên trên ảnh (như ảnh mẫu) thay vì tạo một dải riêng. */
 .app-header {
-  position: relative; z-index: 50; height: var(--header-h); flex-shrink: 0;
-  display: flex; align-items: center; gap: 28px; padding: 0 var(--pad-x);
+  position: relative; z-index: 50; min-height: var(--header-h); flex-shrink: 0;
+  display: flex; align-items: center; gap: clamp(12px, 1.8vw, 28px); padding: 8px var(--pad-x);
   background: rgb(var(--veil) / .92); border-bottom: 1px solid var(--edge);
 }
 .app-frame.flush .app-header {
-  position: absolute; inset: 0 0 auto; height: var(--header-h);
+  position: absolute; inset: 0 0 auto; min-height: var(--header-h);
   background: linear-gradient(rgb(var(--veil) / .72), rgb(var(--veil) / 0)); border-bottom: 0;
+}
+/* Header nổi trên hero/detail cũng thuộc "sân khấu tối" ở light mode: chữ tối
+   trên ảnh tối là không đọc được, nên ép cả thanh về token tối. */
+:root[data-theme='light'] .app-frame.flush .app-header {
+  --ink: #f7f0e7;
+  --ink-dim: #e3d3bd;
+  --ink-faint: #c2a87f;
+  --edge: #3a2c20;
+  --edge-hi: #6b4c33;
+  --veil: 11 8 6;
+  --tint: rgba(255, 255, 255, .08);
+  --tint-soft: rgba(255, 255, 255, .05);
+  --amber: #ffc53d;
+  --on-amber: #17110a;
+  color-scheme: dark;
 }
 .logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .logo span {
@@ -206,18 +260,22 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: up
   font-family: var(--f-display); font-size: 17px; font-weight: 700;
   letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
 }
-.main-nav { display: flex; align-items: center; gap: 2px; }
+.main-nav {
+  display: flex; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: none; white-space: nowrap;
+}
+.main-nav::-webkit-scrollbar { display: none; }
 .main-nav a {
   display: flex; align-items: center; gap: 7px; padding: 9px 13px; border-radius: var(--r-pill);
   font-family: var(--f-mono); font-size: 11px; font-weight: 500; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--ink-dim);
+  text-transform: uppercase; color: var(--ink-dim); white-space: nowrap; flex-shrink: 0;
 }
-.main-nav a svg { width: 15px; }
+.main-nav a svg { width: 15px; flex-shrink: 0; }
 .main-nav a:hover { color: var(--ink); background: var(--tint); }
 .main-nav a.active { color: var(--on-amber); background: var(--amber); }
-.header-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.header-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
 .header-search {
-  display: flex; align-items: center; gap: 9px; width: 250px; height: 40px; padding: 0 15px;
+  display: flex; align-items: center; gap: 9px; flex: 0 1 250px; min-width: 150px; height: 40px; padding: 0 15px;
   background: var(--tint); border: 1px solid var(--edge); border-radius: var(--r-pill);
 }
 .header-search:focus-within { border-color: var(--edge-hi); }
@@ -770,6 +828,10 @@ main.flush { padding-top: 0; }
 }
 .episode-grid a svg { width: 13px; }
 .episode-grid a:hover, .episode-grid a:focus-visible { border-color: var(--amber); color: var(--amber); }
+.film-sources { margin-bottom: 56px; padding-top: 8px; border-top: 1px solid var(--edge); }
+.source-link-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.source-link-grid .button { min-height: 42px; }
+.source-link-grid .button svg { width: 14px; }
 .detail-info { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; padding-top: 36px; border-top: 1px solid var(--edge); }
 .detail-info h2 { margin: 0 0 20px; font-size: 22px; }
 .info-row { display: grid; grid-template-columns: 110px 1fr; gap: 14px; margin: 0 0 12px; font-size: 13px; }
@@ -845,6 +907,64 @@ main.flush { padding-top: 0; }
 .watch-loading { display: grid; min-height: 100vh; place-items: center; background: #000; }
 .watch-loading .state-panel { border: 0; background: none; }
 
+/* --- Bảng phụ đề gắn tay (src/subs/Panel.tsx) --------------------------- */
+/* Dùng lại nguyên hình khối của `.picker`: cùng cách mở/đóng, cùng ba cột đèn — nhãn
+   — dấu tích, nên không phải học lại một thứ hai. Ở đây chỉ thêm những gì menu chọn
+   nguồn không có: hàng công cụ (nút nhỏ nằm ngang), danh sách bản tìm được, và một
+   dòng thông báo. Menu rộng hơn vì tên file phụ đề dài hơn tên nguồn nhiều.
+   Các quy tắc `.sub-menu .sub-* button` cần hai lớp để thắng `.picker-menu button`. */
+.watch-header > .watch-tools { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 10px; margin-left: auto; }
+.watch-tools label { margin-left: 0; }
+.picker-menu.sub-menu { width: 340px; }
+.sub-list { display: flex; flex-direction: column; gap: 2px; }
+/* Nút xoá nằm cùng hàng với track, và chỉ hiện rõ khi trỏ vào hàng đó. */
+.sub-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: center; border-radius: var(--r-sm); }
+.sub-row:hover { background: var(--tint); }
+.sub-menu .sub-drop { grid-template-columns: 1fr; justify-items: center; padding: 9px 0; color: var(--edge-hi); }
+.sub-menu .sub-drop:hover { background: none; color: var(--warn); }
+.sub-menu .sub-drop svg { width: 14px; }
+.sub-tools {
+  display: flex; align-items: center; gap: 6px; margin: 8px 6px 2px;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint);
+}
+.sub-tools > span { display: flex; align-items: center; gap: 6px; margin-right: auto; }
+.sub-tools > span svg { width: 13px; }
+/* Giá trị lệch giờ: chỗ đứng cố định để số đổi không làm hai nút bên cạnh nhảy chỗ. */
+.sub-tools > b { min-width: 48px; font-family: var(--f-mono); font-size: 11px; text-align: center; color: var(--amber); }
+.sub-menu .sub-tools button, .sub-menu .sub-actions button, .sub-menu .sub-url button {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid var(--edge); border-radius: var(--r-sm); background: var(--tint);
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .04em; color: var(--ink-dim);
+}
+.sub-menu .sub-tools button { min-width: 32px; height: 26px; padding: 0 7px; }
+.sub-menu .sub-tools button svg, .sub-menu .sub-actions button svg { width: 13px; }
+.sub-menu .sub-tools button:hover:not(:disabled), .sub-menu .sub-actions button:hover:not(:disabled),
+.sub-menu .sub-url button:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); background: var(--tint); }
+.sub-menu .sub-tools button.on, .sub-menu .sub-actions button.on { border-color: var(--amber); color: var(--amber); }
+.sub-menu .sub-tools button:disabled, .sub-menu .sub-actions button:disabled, .sub-menu .sub-url button:disabled { opacity: .4; }
+/* Ba đường đưa sub vào, chia đều một hàng: không đường nào là đường chính. */
+.sub-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 6px 4px; }
+.sub-menu .sub-actions button { height: 32px; padding: 0 6px; text-transform: uppercase; }
+.sub-url { display: flex; gap: 6px; margin: 4px 6px; }
+.sub-url input {
+  min-width: 0; flex: 1; height: 32px; padding: 0 10px; outline: 0;
+  background: var(--slab); border: 1px solid var(--edge); border-radius: var(--r-sm); color: var(--ink); font-size: 12px;
+}
+.sub-url input:focus { border-color: var(--amber); }
+.sub-menu .sub-url button { width: 56px; height: 32px; text-transform: uppercase; }
+.sub-hits { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--edge); }
+.sub-hits button svg { grid-column: 1; width: 13px; color: var(--ink-faint); }
+/* Tên bản sub dài hơn bề ngang menu là chuyện thường — cắt, đừng để nó đẩy dấu tích. */
+.sub-hits button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-notice { margin: 8px 6px 2px; font-family: var(--f-mono); font-size: 10px; line-height: 1.6; color: var(--amber); }
+.picker-hint.warn { display: flex; align-items: flex-start; gap: 6px; color: var(--warn); }
+.picker-hint.warn svg { flex-shrink: 0; width: 13px; margin-top: 1px; }
+/* `::cue` chỉ nhận một nhóm nhỏ thuộc tính (cỡ chữ, màu, nền, bóng) và cỡ được tính
+   theo chiều cao khung phim, nên ba bậc dưới đây là phần trăm chứ không phải px. */
+.player-frame video.cue-sm::cue { font-size: 75%; }
+.player-frame video.cue-md::cue { font-size: 100%; }
+.player-frame video.cue-lg::cue { font-size: 135%; }
+
 /* --- Chân trang --------------------------------------------------------- */
 footer {
   display: flex; align-items: center; gap: 26px; min-height: 120px;
@@ -858,13 +978,19 @@ footer > div { display: flex; gap: 18px; margin-left: auto; font-family: var(--f
 footer > div a:hover { color: var(--amber); }
 
 /* --- Thu nhỏ ------------------------------------------------------------ */
+@media (max-width: 1360px) {
+  .app-header { gap: 14px; }
+  .main-nav a { padding: 9px 10px; }
+  .main-nav a svg { display: none; }
+  .header-search { flex-basis: 210px; min-width: 130px; }
+  .hero-layout { gap: clamp(20px, 3vw, 40px); }
+}
 @media (max-width: 1180px) {
   .movie-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .episode-grid, .people-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .continue-grid, .code-grid { grid-template-columns: repeat(3, 1fr); }
   .main-nav a { padding: 9px 8px; }
-  .main-nav a svg { display: none; }
-  .header-search { width: 200px; }
+  .header-search { flex-basis: 180px; }
   /* Tên nguồn là thứ đầu tiên bỏ khi thanh trên hẹp lại: biểu tượng + menu vẫn
      nói đủ, còn ô tìm kiếm thì không thu nhỏ thêm được nữa. */
   .picker-value { display: none; }
@@ -873,7 +999,8 @@ footer > div a:hover { color: var(--amber); }
 @media (max-width: 1020px) {
   /* Dưới ngưỡng này panel kính không còn đủ chỗ cạnh tiêu đề: xếp dọc. */
   .hero-layout { grid-template-columns: minmax(0, 1fr); gap: 26px; }
-  .hero-panel { width: min(560px, 100%); }
+  .hero-panel { width: min(620px, 100%); }
+  .hero-copy, .detail-copy { max-width: 100%; }
   /* Thước vị trí là phần rộng nhất của khối điều khiển: bỏ trước, giữ lại số
      thứ tự và hai nút bước vì đó mới là thứ dùng để đi tới. */
   .rail-ticks { display: none; }
@@ -900,8 +1027,11 @@ footer > div a:hover { color: var(--amber); }
   .picker-menu, .picker-menu.compact { width: min(272px, calc(100vw - 2 * var(--pad-x))); }
   body.menu-open { overflow: hidden; }
   .hero, .detail-hero { min-height: 76vh; }
+  .hero-layout { padding-top: calc(var(--header-h) + 20px); }
   .hero-copy, .detail-copy { width: 100%; }
-  .hero-title { font-size: clamp(36px, 12vw, 68px); }
+  .detail-copy { padding: 0 var(--pad-x) clamp(28px, 4vh, 48px); }
+  .hero-title { font-size: clamp(34px, 11vw, 68px); text-wrap: balance; }
+  .hero-panel { padding: 18px; }
   .next-grid { grid-template-columns: 1fr 1fr; }
   .page-top { padding-top: 28px; }
   .page-title { align-items: flex-start; flex-direction: column; gap: 16px; }
@@ -929,6 +1059,10 @@ footer > div a:hover { color: var(--amber); }
 }
 @media (max-width: 520px) {
   .logo b { display: none; }
+  .app-header { gap: 8px; }
+  .hero-layout { padding-inline: var(--pad-x); }
+  .hero-panel { border-radius: var(--r-sm); }
+  .next-grid { gap: 8px; }
   .movie-grid, .continue-grid, .code-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .continue-grid, .code-grid { grid-template-columns: 1fr; }
   .episode-grid, .people-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

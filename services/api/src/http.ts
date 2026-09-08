@@ -26,9 +26,7 @@ export const asyncRoute = (handler: (req: express.Request, res: express.Response
  *
  * `Vary: Origin` là bắt buộc: CORS trả `Access-Control-Allow-Origin` theo origin
  * của người gọi, thiếu Vary thì cache chung có thể đưa lại header của origin khác
- * và trình duyệt chặn. `x-catalog-source` đi kèm vì `preferredCatalog()` cũng đọc
- * header đó — web gửi nguồn qua `?source=` (tự chia khoá cache rồi), nhưng ai gọi
- * bằng curl kèm header thì không được ăn lại bản của nguồn khác.
+ * và trình duyệt chặn.
  *
  * `stale-while-revalidate` là phần đáng giá nhất: hết hạn rồi thì trình duyệt vẫn
  * vẽ ngay bản cũ và đi lấy bản mới ở nền, nên lần mở lại nào cũng có hình liền.
@@ -37,6 +35,6 @@ export const cachedRoute = (seconds: number, load: (req: express.Request) => Pro
   asyncRoute(async (req, res) => {
     const body = await load(req);
     res.header('Cache-Control', `public, max-age=${seconds}, stale-while-revalidate=${seconds * 5}`);
-    res.header('Vary', 'Origin, x-catalog-source');
+    res.header('Vary', 'Origin');
     res.json(body);
   });

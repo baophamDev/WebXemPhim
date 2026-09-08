@@ -26,13 +26,10 @@
  * có hàng đợi riêng. Chấp nhận được — job chỉ là *tiến trình* của một lần nhập,
  * còn kết quả thì nằm ở DB dùng chung, nên instance nào nhập cũng như nhau.
  */
-import type { DetailStage } from './providers/types.js';
-
 /**
- * Chặng của một lần nhập. Bốn chặng giữa do resolver báo (`DetailStage`) — chúng
- * là các bước thật của `detail()`, không phải mốc phần trăm bịa ra cho đẹp.
+ * Chặng của một lần nhập từ VSMOV: xếp hàng → tải → lưu → xong.
  */
-export type ImportStage = 'queued' | DetailStage | 'saving' | 'ready' | 'failed';
+export type ImportStage = 'queued' | 'loading' | 'saving' | 'ready' | 'failed';
 
 export interface ImportJob {
   slug: string;

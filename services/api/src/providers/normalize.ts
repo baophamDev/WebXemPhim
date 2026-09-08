@@ -10,8 +10,7 @@
  * snake_case của nguồn lẫn camelCase; trả thì luôn đúng `MovieSummary`.
  */
 import { z } from 'zod';
-import { fold } from '../text.js';
-import type { EpisodeGroup, ListPage, MovieSummary, Pagination, SourceDetail, Taxonomy } from './types.js';
+import type { ListPage, MovieSummary, Pagination, SourceDetail, Taxonomy } from './types.js';
 
 /** Chuỗi rỗng/khoảng trắng coi như không có, để nguồn khác bồi vào được. */
 export const str = (value: unknown): string | null => {
@@ -137,76 +136,4 @@ function withSource<T>(source: string, run: () => T): T {
     }
     throw error;
   }
-}
-
-/**
- * Điểm khớp giữa hai phim ở hai nguồn khác nhau, dùng khi một nguồn không có
- * slug mà nguồn kia có. 1 là chắc chắn, dưới `MATCH_THRESHOLD` thì coi như không
- * tìm thấy — thà thiếu metadata còn hơn gán poster của phim khác.
- */
-export const MATCH_THRESHOLD = 0.72;
-
-export function matchScore(
-  a: { name?: string | null; originName?: string | null; year?: number | null },
-  b: { name?: string | null; originName?: string | null; year?: number | null }
-): number {
-  const left = [fold(a.name), fold(a.originName)].filter(Boolean);
-  const right = [fold(b.name), fold(b.originName)].filter(Boolean);
-  if (!left.length || !right.length) return 0;
-  let best = 0;
-  for (const x of left) for (const y of right) best = Math.max(best, similarity(x, y));
-  if (a.year && b.year) {
-    // Lệch 1 năm là chuyện thường (ngày phát hành theo quốc gia); lệch hơn thì trừ nặng.
-    const gap = Math.abs(a.year - b.year);
-    if (gap === 0) best += 0.08;
-    else if (gap > 1) best -= 0.3;
-  }
-  return Math.max(0, Math.min(1, best));
-}
-
-/** Dice coefficient trên bigram: rẻ, không phụ thuộc thứ tự từ, đủ cho tên phim. */
-function similarity(a: string, b: string): number {
-  if (a === b) return 1;
-  if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
-  const bigrams = new Map<string, number>();
-  for (let i = 0; i < a.length - 1; i++) {
-    const gram = a.slice(i, i + 2);
-    bigrams.set(gram, (bigrams.get(gram) ?? 0) + 1);
-  }
-  let hits = 0;
-  for (let i = 0; i < b.length - 1; i++) {
-    const gram = b.slice(i, i + 2);
-    const count = bigrams.get(gram) ?? 0;
-    if (count > 0) {
-      bigrams.set(gram, count - 1);
-      hits++;
-    }
-  }
-  return (2 * hits) / (a.length - 1 + b.length - 1);
-}
-
-/** Field nào của nguồn metadata được phép bồi vào chỗ trống của nguồn phát. */
-const FILLABLE = [
-  'originName', 'description', 'posterUrl', 'thumbUrl', 'trailerUrl', 'rating',
-  'year', 'duration', 'language', 'tmdbId', 'imdbId'
-] as const;
-
-/**
- * Bồi metadata: chỉ ghi vào field đang `null`/rỗng của `base`, không bao giờ
- * ghi đè. Nguồn phát là nguồn sự thật về phim nó phát (tên, tập, chất lượng);
- * nguồn metadata chỉ lấp lỗ.
- */
-export function enrich(base: MovieSummary, extra: Partial<MovieSummary>): MovieSummary {
-  const merged = { ...base } as MovieSummary & Record<string, unknown>;
-  for (const key of FILLABLE) {
-    if (merged[key] == null && extra[key] != null) merged[key as string] = extra[key];
-  }
-  for (const key of ['genres', 'countries', 'actors', 'directors'] as const) {
-    if (!merged[key].length && extra[key]?.length) merged[key] = [...extra[key]];
-  }
-  return merged;
-}
-
-export function episodeCount(groups: EpisodeGroup[]): number {
-  return groups.reduce((total, group) => total + group.server_data.length, 0);
 }

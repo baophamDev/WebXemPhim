@@ -1,100 +1,79 @@
 /**
- * Nơi quyết định nguồn nào được bật và theo thứ tự nào.
+ * Nguồn catalog duy nhất: VSMOV.
  *
- * Cấu hình bằng `CATALOG_SOURCES`, danh sách tên cách nhau bằng dấu phẩy, **thứ
- * tự là ưu tiên**:
- *
- *   CATALOG_SOURCES=vsmov,tmdb    nguồn phát trước, TMDB bồi metadata
- *   CATALOG_SOURCES=tmdb          chỉ catalog metadata, không phát
- *
- * `CATALOG_PROVIDER` (số ít) của bản cũ vẫn đọc được để lần deploy tới không cần
- * đổi biến môi trường trước — coi như danh sách một phần tử.
- *
- * Nguồn thiếu cấu hình thì **im lặng bỏ qua** chứ không làm sập tiến trình: TMDB
- * không có khoá API là chuyện bình thường ở máy dev, và không có lý do gì để cả
- * API không khởi động được vì thiếu một nguồn bồi metadata. Nhưng bật đúng tên mà
- * nguồn không tồn tại thì vẫn ném — đó là lỗi chính tả trong cấu hình, im lặng
- * chỉ khiến người ta đi tìm ở chỗ khác.
- *
- * `mdl` (MyDramaList) có tên trong bảng nhưng `source: null`: chưa có API công
- * khai nên chưa viết adapter. Khai báo sẵn để `/api/providers` nói được "có nguồn
- * này, đang thiếu khoá" và web hiện nó mờ — thêm sau chỉ là điền `source`.
+ * Không còn tầng adapter đa nguồn (resolver, fallback, circuit breaker, bồi
+ * metadata TMDB/TVDB, nguồn web theo slug). Mọi route gọi thẳng `vsmov` và
+ * validate shape ở biên bằng `normalize.ts`.
  */
-import { CatalogResolver } from './resolver.js';
-import { tmdb, tmdbEnabled } from './tmdb.js';
-import { tvdb, tvdbEnabled } from './tvdb.js';
-import type { CatalogSource, InactiveSource, SourceKind } from './types.js';
+import { checkDetail, checkList, checkTaxonomy } from './normalize.js';
+import type { CatalogFilters } from './types.js';
 import { vsmov } from './vsmov.js';
 
-interface Entry {
-  /** null = đã đặt tên nhưng chưa có adapter. */
-  source: CatalogSource | null;
-  kind: SourceKind;
-  enabled: boolean;
-  hint: string;
-}
+const SOURCE = 'vsmov';
 
-const AVAILABLE: Record<string, Entry> = {
-  vsmov: { source: vsmov, kind: 'playable', enabled: true, hint: '' },
-  tmdb: { source: tmdb, kind: 'metadata', enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' },
-  tvdb: { source: tvdb, kind: 'metadata', enabled: tvdbEnabled, hint: 'thiếu TVDB_API_KEY' },
-  mdl: {
-    source: null,
-    kind: 'metadata',
-    enabled: false,
-    hint: 'MyDramaList chưa mở API công khai — cần xin khoá ở mydramalist.com/api_request'
+export const catalog = {
+  names: [SOURCE],
+  latest: async (page: number, limit = 24) => ({
+    ...(checkList(SOURCE, await vsmov.latest(page, limit))),
+    source: SOURCE
+  }),
+  home: async (filters: CatalogFilters = {}) => ({
+    ...(checkList(SOURCE, await vsmov.home(filters))),
+    source: SOURCE
+  }),
+  listBySlug: async (slug: string, filters: CatalogFilters = {}) => ({
+    ...(checkList(SOURCE, await vsmov.list(slug, filters))),
+    source: SOURCE
+  }),
+  search: async (keyword: string, filters: CatalogFilters = {}) => ({
+    ...(checkList(SOURCE, await vsmov.search(keyword, filters))),
+    source: SOURCE
+  }),
+  genres: async () => ({
+    ...(checkTaxonomy(SOURCE, await vsmov.genres())),
+    source: SOURCE
+  }),
+  byGenre: async (slug: string, filters: CatalogFilters = {}) => ({
+    ...(checkList(SOURCE, await vsmov.byGenre(slug, filters))),
+    source: SOURCE
+  }),
+  countries: async () => ({
+    ...(checkTaxonomy(SOURCE, await vsmov.countries())),
+    source: SOURCE
+  }),
+  byCountry: async (slug: string, filters: CatalogFilters = {}) => ({
+    ...(checkList(SOURCE, await vsmov.byCountry(slug, filters))),
+    source: SOURCE
+  }),
+  years: async () => ({
+    ...(checkTaxonomy(SOURCE, await vsmov.years())),
+    source: SOURCE
+  }),
+  byYear: async (year: string, filters: CatalogFilters = {}) => ({
+    ...(checkList(SOURCE, await vsmov.byYear(year, filters))),
+    source: SOURCE
+  }),
+  actors: async () => ({
+    ...(checkTaxonomy(SOURCE, await vsmov.actors())),
+    source: SOURCE
+  }),
+  codes: async () => ({
+    ...(checkTaxonomy(SOURCE, await vsmov.codes())),
+    source: SOURCE
+  }),
+  byCode: async (code: string, filters: CatalogFilters = {}) => ({
+    ...(checkList(SOURCE, await vsmov.byCode(code, filters))),
+    source: SOURCE
+  }),
+  detail: async (slug: string, report?: (stage: 'loading', source: string | null) => void) => {
+    report?.('loading', SOURCE);
+    const detail = checkDetail(SOURCE, await vsmov.detail(slug));
+    return { ...detail, source: SOURCE };
   }
 };
 
-const DEFAULT_ORDER = 'vsmov,tmdb,tvdb';
-
-function requested(): string[] {
-  const raw = process.env.CATALOG_SOURCES ?? process.env.CATALOG_PROVIDER ?? DEFAULT_ORDER;
-  const names = raw.split(',').map((name) => name.trim().toLowerCase()).filter(Boolean);
-  return [...new Set(names)];
-}
-
-function build(): CatalogSource[] {
-  const enabled: CatalogSource[] = [];
-  for (const name of requested()) {
-    const entry = AVAILABLE[name];
-    if (!entry) throw new Error(`Nguồn catalog không tồn tại: "${name}" (có: ${Object.keys(AVAILABLE).join(', ')})`);
-    if (!entry.enabled || !entry.source) {
-      console.warn(`[catalog] bỏ qua nguồn ${name}: ${entry.hint}`);
-      continue;
-    }
-    enabled.push(entry.source);
-  }
-  if (!enabled.length) {
-    // Không còn nguồn nào bật được: vẫn cắm vsmov vào để API mở cổng và các đường
-    // có fallback về DB (menu điều hướng, /api/movies) tiếp tục phục vụ được.
-    console.warn('[catalog] không nguồn nào được bật, quay về vsmov');
-    return [vsmov];
-  }
-  return enabled;
-}
-
-export const catalog = new CatalogResolver(build());
-
-/**
- * Nguồn có tên nhưng không nằm trong resolver — kèm lý do. Web dùng danh sách này
- * để hiện mục mờ trong bộ chọn nguồn: biết nguồn tồn tại và biết thiếu gì thì hơn
- * là không thấy gì cả.
- */
-export function inactiveSources(): InactiveSource[] {
-  const active = new Set(catalog.names);
-  return Object.entries(AVAILABLE)
-    .filter(([name]) => !active.has(name))
-    .map(([name, entry]) => ({
-      name,
-      kind: entry.kind,
-      hint: entry.hint || (entry.source ? 'chưa bật trong CATALOG_SOURCES' : 'chưa có adapter')
-    }));
-}
-
-console.log(`[catalog] nguồn đang bật (theo ưu tiên): ${catalog.names.join(' → ')}`);
+console.log('[catalog] nguồn duy nhất: vsmov');
 
 export type {
-  CatalogFilters, CatalogSource, InactiveSource, ListPage, MovieSummary, SourceDetail, SourceHealth, Taxonomy
+  CatalogFilters, ListPage, MovieSummary, SourceDetail, Taxonomy, VsmovDetail
 } from './types.js';
-export type { ResolvedDetail } from './resolver.js';
