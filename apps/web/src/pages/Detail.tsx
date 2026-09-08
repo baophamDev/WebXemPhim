@@ -7,6 +7,7 @@ import { filmSources, filmSourceUrl } from '../filmSources';
 import { previewFromState, recallMovie, rememberMovie } from '../preview';
 import type { CastMember, Episode, Movie } from '../types';
 import { Breadcrumb, clean, EmptyState, ErrorState, image, ImportPanel, RailLabel, Shell, Spec, useImportProgress } from '../ui';
+import { useHeroEntrance } from '../ui/motion';
 
 function FavoriteButton({ movieId }: { movieId: number }) {
   const favorite = useGetFavoriteQuery(movieId);
@@ -93,6 +94,9 @@ export default function Detail() {
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
   const movie: Movie | null = fetched ?? preview;
   const failed = result.isError || Boolean(progress.failure);
+  // Hook entrance phải đứng trước mọi `return` có điều kiện (luật hooks):
+  // đổi slug thì diễn lại từ đầu, còn skeleton/error thì ref không gắn vào đâu.
+  const scope = useHeroEntrance<HTMLElement>([slug]);
   // Nhớ bản đầy đủ: quay lại trang này (back/forward) là có ngay, không chờ mạng.
   useEffect(() => { rememberMovie(fetched); }, [fetched]);
 
@@ -115,12 +119,12 @@ export default function Detail() {
   const loading = !fetched;
 
   return <Shell flush>
-    <section className="detail-hero">
-      <img className="detail-media" src={image(movie, true) || '/poster-placeholder.svg'} alt="" fetchPriority="high" decoding="async" />
+    <section className="detail-hero" ref={scope}>
+      <img data-motion="media" className="detail-media" src={image(movie, true) || '/poster-placeholder.svg'} alt="" fetchPriority="high" decoding="async" />
       <div className="hero-veil" />
       <div className="detail-inner">
         <Breadcrumb items={[['Trang chủ', '/'], ['Khám phá', '/browse/list/phim-moi-cap-nhat'], [movie.name, '']]} />
-        <div className="detail-copy">
+        <div className="detail-copy" data-motion="copy">
           <RailLabel prefix="PHIM">{movie.type === 'series' ? 'Phim bộ' : 'Phim lẻ'}</RailLabel>
           <h1 className="hero-title detail">{movie.name}</h1>
           <p className="origin-name">{movie.originName}</p>

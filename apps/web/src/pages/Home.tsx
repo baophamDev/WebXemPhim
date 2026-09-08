@@ -2,7 +2,10 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
-import { clean, BackToTop, ErrorState, HeroPanelBeam, image, MovieRow, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
+import { clean, BackToTop, ErrorState, image, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
+import { HeroPanelBeam } from '../ui/beam';
+import { MovieRow } from '../ui/Rail';
+import { useHeroEntrance } from '../ui/motion';
 import type { Movie } from '../types';
 
 /**
@@ -46,6 +49,38 @@ function NextUp({ items }: { items: Movie[] }) {
   </div>;
 }
 
+/**
+ * Mở màn trang chủ. Tách khỏi `Home` để timeline GSAP bám theo `featured`:
+ * dữ liệu về sau mount, `useHeroEntrance` diễn lại mỗi khi đổi phim nổi bật.
+ */
+function Hero({ featured, next, warm }: { featured: Movie; next: Movie[]; warm: (movie: Movie) => () => void }) {
+  const scope = useHeroEntrance<HTMLElement>([featured.slug]);
+  return <section className="hero" ref={scope}>
+    {/* fetchPriority + không lazy: đây là ảnh LCP của trang chủ. */}
+    <img data-motion="media" className="hero-media" src={image(featured, true) || '/poster-placeholder.svg'} alt="" fetchPriority="high" decoding="async" />
+    <div className="hero-veil" />
+    <div className="hero-layout">
+      <div className="hero-copy" data-motion="copy">
+        <span className="hero-eyebrow">{featured.genres?.[0] ?? 'Đang nổi'} · {featured.type === 'series' || featured.type === 'tv' ? 'Phim bộ' : 'Phim lẻ'}</span>
+        <HeroTitle name={featured.name} />
+        <FavoriteButton movie={featured} />
+      </div>
+      <HeroPanelBeam>
+      <aside className="hero-panel hero-panel--beam">
+        <span className="hero-eyebrow">{featured.originName || 'Mới về kho'}</span>
+        <Spec movie={featured} />
+        <p className="description">{clean(featured.description) || `Xem ${featured.name} ngay trên kho phim của gia đình.`}</p>
+        <div className="actions">
+          <Link className="button primary" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Play fill="currentColor" />Phát</Link>
+          <Link className="button ghost" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Film />Chi tiết</Link>
+        </div>
+        <NextUp items={next} />
+      </aside>
+      </HeroPanelBeam>
+    </div>
+  </section>;
+}
+
 export default function Home() {
   /**
    * `page`/`limit` của dải đầu này phải khớp với request mà `index.html` bắn
@@ -67,30 +102,7 @@ export default function Home() {
   }
   return <Shell flush>
     {featured
-      ? <section className="hero">
-          {/* fetchPriority + không lazy: đây là ảnh LCP của trang chủ. */}
-          <img className="hero-media" src={image(featured, true) || '/poster-placeholder.svg'} alt="" fetchPriority="high" decoding="async" />
-          <div className="hero-veil" />
-          <div className="hero-layout">
-            <div className="hero-copy">
-              <span className="hero-eyebrow">{featured.genres?.[0] ?? 'Đang nổi'} · {featured.type === 'series' || featured.type === 'tv' ? 'Phim bộ' : 'Phim lẻ'}</span>
-              <HeroTitle name={featured.name} />
-              <FavoriteButton movie={featured} />
-            </div>
-            <HeroPanelBeam>
-            <aside className="hero-panel hero-panel--beam">
-              <span className="hero-eyebrow">{featured.originName || 'Mới về kho'}</span>
-              <Spec movie={featured} />
-              <p className="description">{clean(featured.description) || `Xem ${featured.name} ngay trên kho phim của gia đình.`}</p>
-              <div className="actions">
-                <Link className="button primary" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Play fill="currentColor" />Phát</Link>
-                <Link className="button ghost" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Film />Chi tiết</Link>
-              </div>
-              <NextUp items={next} />
-            </aside>
-            </HeroPanelBeam>
-          </div>
-        </section>
+      ? <Hero featured={featured} next={next} warm={warm} />
       : <div className="hero-skeleton" />}
     <div className="page-container page-top">
       <SyncStatus />

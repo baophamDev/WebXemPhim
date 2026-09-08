@@ -465,6 +465,12 @@ main.flush { padding-top: 0; }
 /* Wrapper của lib border-beam: thay aside thành grid item của .hero-layout nên
    phải co được như panel cũ, và giữ nhịp trồi lên .16s của chuỗi mở màn. */
 .hero-beam { min-width: 0; animation: rise .5s cubic-bezier(.2, .7, .3, 1) .16s both; }
+/* GSAP đã nhận phần mở màn hero (xem ui/motion.ts): tắt keyframes CSS trùng để
+   khỏi diễn hai lần. Trạng thái đầu do GSAP đặt lúc chạy nên không có JS thì
+   nội dung vẫn hiện đủ — class này chỉ xuất hiện khi GSAP thật sự chạy. */
+.gsap-on .hero-media,
+.gsap-on .hero-copy > *,
+.gsap-on .hero-beam { animation: none; }
 /* Panel dùng lib vẽ viền động: bỏ viền aurora + animation tay để khỏi đè hai
    lớp chuyển động lên nhau (đúng lỗi "thô" trên mobile), chỉ giữ kính mờ. */
 .hero-panel--beam {

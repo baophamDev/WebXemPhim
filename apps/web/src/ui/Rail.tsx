@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Movie } from '../types';
 import { stillMotion } from './format';
+import { useReveal } from './motion';
 import { MovieCard, RailLabel } from './cards';
 
 const AUTO_MS = 4000;
@@ -157,7 +158,8 @@ function useRail(count: number) {
  */
 function Rail({ label, title, items, to, ranked = false }: RailProps) {
   const { ref, index, span, hold, nudge, handlers } = useRail(items.length);
-  return <section className="shelf">
+  const shelf = useReveal<HTMLElement>(26, [items.length]);
+  return <section className="shelf" ref={shelf}>
     <div className="section-heading">
       <div><RailLabel prefix="MỤC">{label}</RailLabel><h2>{title}</h2></div>
       <div className="rail-tools">

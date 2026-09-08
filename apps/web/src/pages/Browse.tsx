@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { useGetCatalogQuery, useGetNavigationQuery, useGetTaxonomyQuery } from '../api';
 import type { CatalogKind, CatalogQuery, TaxonomyItem } from '../types';
 import { Breadcrumb, EmptyState, ErrorState, humanize, listLabels, MovieCard, Pagination, RailLabel, Shell, SkeletonGrid } from '../ui';
+import { useReveal } from '../ui/motion';
 
 const typeOptions: TaxonomyItem[] = [
   { id: 'single', name: 'Phim lẻ', slug: 'single', thumbUrl: null },
@@ -87,6 +88,7 @@ export default function Browse() {
     : safeKind === 'country' ? `Phim ${humanize(value)}`
     : safeKind === 'year' ? `Phim năm ${value}`
     : `Lịch phát hành ${decodeURIComponent(value)}`;
+  const grid = useReveal<HTMLDivElement>(26, [safeKind, value, page, filters.category, filters.country, filters.year, filters.type, filters.status]);
   const label = safeKind === 'genre' ? 'THỂ LOẠI' : safeKind === 'country' ? 'QUỐC GIA' : safeKind === 'year' ? 'NĂM' : 'DANH SÁCH';
 
   return <Shell>
@@ -104,7 +106,7 @@ export default function Browse() {
         : result.isError ? <ErrorState onRetry={result.refetch} />
         : result.data?.items.length
           ? <>
-              <div className="movie-grid">{result.data.items.map((movie, index) => <MovieCard key={`${movie.slug}-${index}`} movie={movie} />)}</div>
+              <div className="movie-grid" ref={grid}>{result.data.items.map((movie, index) => <MovieCard key={`${movie.slug}-${index}`} movie={movie} />)}</div>
               <Pagination current={page} total={result.data.pagination.totalPages} onChange={(next) => update('page', String(next))} />
             </>
           : <EmptyState />}
