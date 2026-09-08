@@ -1,6 +1,6 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { useGetCatalogQuery, useGetNavigationQuery } from '../api';
+import { useGetCatalogQuery, useGetNavigationQuery, useGetTaxonomyQuery } from '../api';
 import type { CatalogKind, CatalogQuery, TaxonomyItem } from '../types';
 import { Breadcrumb, EmptyState, ErrorState, humanize, listLabels, MovieCard, Pagination, RailLabel, Shell, SkeletonGrid } from '../ui';
 
@@ -47,14 +47,26 @@ function SelectFilter({ label, value, items, onChange }: { label: string; value:
   </label>;
 }
 
-/** Một request /catalog/navigation thay cho ba request thể loại/quốc gia/năm. */
+/**
+ * Một request /catalog/navigation thay cho ba request thể loại/quốc gia/năm.
+ * Đường lùi khi API còn bản cũ (chưa có /navigation, trả 404): gọi lại ba
+ * route taxonomy cũ để dropdown không trắng. API mới thì ba query này skip,
+ * không tốn request nào thêm.
+ */
 function FilterBar({ filters, update }: { filters: Record<string, any>; update: (key: string, value: string) => void }) {
-  const { data } = useGetNavigationQuery();
+  const nav = useGetNavigationQuery();
+  const legacy = nav.isError;
+  const genres = useGetTaxonomyQuery('genres', { skip: !legacy });
+  const countries = useGetTaxonomyQuery('countries', { skip: !legacy });
+  const years = useGetTaxonomyQuery('years', { skip: !legacy });
+  const genreItems = nav.data?.genres ?? genres.data?.items ?? [];
+  const countryItems = nav.data?.countries ?? countries.data?.items ?? [];
+  const yearItems = nav.data?.years ?? years.data?.items ?? [];
   return <div className="filter-bar">
     <span className="filter-label"><SlidersHorizontal />Bộ lọc</span>
-    <SelectFilter label="Thể loại" value={filters.category ?? ''} items={data?.genres ?? []} onChange={(v) => update('category', v)} />
-    <SelectFilter label="Quốc gia" value={filters.country ?? ''} items={data?.countries ?? []} onChange={(v) => update('country', v)} />
-    <SelectFilter label="Năm" value={filters.year ?? ''} items={(data?.years ?? []).slice(0, 50)} onChange={(v) => update('year', v)} />
+    <SelectFilter label="Thể loại" value={filters.category ?? ''} items={genreItems} onChange={(v) => update('category', v)} />
+    <SelectFilter label="Quốc gia" value={filters.country ?? ''} items={countryItems} onChange={(v) => update('country', v)} />
+    <SelectFilter label="Năm" value={filters.year ?? ''} items={yearItems.slice(0, 50)} onChange={(v) => update('year', v)} />
     <SelectFilter label="Định dạng" value={filters.type ?? ''} items={typeOptions} onChange={(v) => update('type', v)} />
     <SelectFilter label="Trạng thái" value={filters.status ?? ''} items={statusOptions} onChange={(v) => update('status', v)} />
   </div>;
