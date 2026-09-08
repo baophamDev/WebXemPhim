@@ -9,7 +9,8 @@ import {
   saveProgress, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
 } from './db.js';
 import { describeFailure, shortCause } from './errors.js';
-import { asyncRoute, cachedRoute } from './http.js';
+import { asyncRoute, serverCachedRoute } from './http.js';
+import { cacheInvalidate, routeKey } from './cache.js';
 import { forgetImport, importJob, importQueueSize, startImport, waitForImport, type ImportJob, type Report } from './importer.js';
 import { catalog, type CatalogFilters } from './providers/index.js';
 import { slugifyName } from './text.js';
@@ -166,29 +167,28 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-ci
 
 /**
  * Danh sách phim và taxonomy đều là dữ liệu chung, không cá nhân hoá, và đổi vài
- * lần một giờ là nhiều. Cho trình duyệt giữ lại một lúc: lần mở lại (F5, back,
- * hay mở lại app trên TV) không phải chờ nguồn ngoài trả lời lần nữa.
- *
- * Danh mục (thể loại/quốc gia/năm/code) đổi cực chậm nên giữ 10 phút; danh sách
- * phim 1 phút để "vừa thêm vào kho" không bị cũ tới mức nhìn ra được; tìm kiếm 30
- * giây, đủ cho cú bấm back mà không ai kịp thấy kết quả lạc hậu.
+ * lần một giờ là nhiều. Hai lớp cache chồng nhau:
+ * - Trình duyệt giữ lại một lúc (`Cache-Control`, xem `http.ts`).
+ * - Server giữ bản dùng chung trong Redis (lùi về RAM): lần mở lại (F5, back,
+ *   hay mở lại app trên TV) của *bất kỳ ai* cũng không phải chờ nguồn ngoài.
  *
  * Ba đường **không** có ở đây là cố ý: `/catalog/movies/:slug` có thể trả 202
- * "đang nhập" (cache lại là đóng băng đúng cái đang chạy), còn `/api/movies` với
- * `/api/search` đọc DB của mình nên vốn đã nhanh.
+ * "đang nhập" (cache lại là đóng băng đúng cái đang chạy), còn `/api/people*`
+ * đọc bảng nhỏ nên vốn đã nhanh.
  */
-app.get('/api/catalog/home', cachedRoute(60, (req) => catalog.home(queryFilters(req.query))));
-app.get('/api/catalog/lists/:slug', cachedRoute(60, (req) => catalog.listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query))));
-app.get('/api/catalog/search', cachedRoute(30, (req) => catalog.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
-app.get('/api/catalog/genres', cachedRoute(600, () => taxonomyWithFallback(() => catalog.genres(), listGenresFromDb)));
-app.get('/api/catalog/genres/:slug', cachedRoute(60, (req) => catalog.byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query))));
-app.get('/api/catalog/countries', cachedRoute(600, () => taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb)));
-app.get('/api/catalog/countries/:slug', cachedRoute(60, (req) => catalog.byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query))));
-app.get('/api/catalog/years', cachedRoute(600, () => taxonomyWithFallback(() => catalog.years(), listYearsFromDb)));
-app.get('/api/catalog/years/:year', cachedRoute(60, (req) => catalog.byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query))));
+const catalogKey = (prefix: string) => (req: express.Request) => routeKey(prefix, { ...req.query, ...req.params });
+app.get('/api/catalog/home', serverCachedRoute(60, catalogKey('catalog:home'), (req) => catalog.home(queryFilters(req.query))));
+app.get('/api/catalog/lists/:slug', serverCachedRoute(60, catalogKey('catalog:list'), (req) => catalog.listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/search', serverCachedRoute(30, catalogKey('catalog:search'), (req) => catalog.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
+app.get('/api/catalog/genres', serverCachedRoute(600, catalogKey('catalog:genres'), () => taxonomyWithFallback(() => catalog.genres(), listGenresFromDb)));
+app.get('/api/catalog/genres/:slug', serverCachedRoute(60, catalogKey('catalog:genre'), (req) => catalog.byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/countries', serverCachedRoute(600, catalogKey('catalog:countries'), () => taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb)));
+app.get('/api/catalog/countries/:slug', serverCachedRoute(60, catalogKey('catalog:country'), (req) => catalog.byCountry(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/years', serverCachedRoute(600, catalogKey('catalog:years'), () => taxonomyWithFallback(() => catalog.years(), listYearsFromDb)));
+app.get('/api/catalog/years/:year', serverCachedRoute(60, catalogKey('catalog:year'), (req) => catalog.byYear(z.string().regex(/^\d{4}$/).parse(req.params.year), queryFilters(req.query))));
 
 // Một request cho toàn bộ menu điều hướng, thay vì 3 request song song lúc mở trang.
-app.get('/api/catalog/navigation', cachedRoute(600, async () => {
+app.get('/api/catalog/navigation', serverCachedRoute(600, catalogKey('catalog:navigation'), async () => {
   const [genres, countries, years] = await Promise.all([
     taxonomyWithFallback(() => catalog.genres(), listGenresFromDb),
     taxonomyWithFallback(() => catalog.countries(), listCountriesFromDb),
@@ -197,8 +197,8 @@ app.get('/api/catalog/navigation', cachedRoute(600, async () => {
   return { genres: genres.items, countries: countries.items, years: years.items };
 }));
 
-app.get('/api/catalog/codes', cachedRoute(600, () => catalog.codes()));
-app.get('/api/catalog/codes/:code', cachedRoute(60, (req) => catalog.byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query))));
+app.get('/api/catalog/codes', serverCachedRoute(600, catalogKey('catalog:codes'), () => catalog.codes()));
+app.get('/api/catalog/codes/:code', serverCachedRoute(60, catalogKey('catalog:code'), (req) => catalog.byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query))));
 app.get('/api/catalog/movies/:slug', asyncRoute(async (req, res) => { await respondWithMovie(req, res, slugSchema.parse(req.params.slug)); }));
 
 const moviesQuerySchema = z.object({
@@ -214,9 +214,9 @@ const moviesQuerySchema = z.object({
   sort: z.enum(['recent', 'rating', 'year', 'name', 'views']).default('recent')
 });
 
-app.get('/api/movies', asyncRoute(async (req, res) => {
+app.get('/api/movies', serverCachedRoute(60, catalogKey('movies'), async (req) => {
   const query = moviesQuerySchema.parse(req.query);
-  res.json(await listMovies({ ...query, q: query.q || undefined }));
+  return listMovies({ ...query, q: query.q || undefined });
 }));
 
 // Diễn viên & đạo diễn. `q` tìm không dấu: "tran thanh" ra "Trấn Thành".
@@ -256,7 +256,7 @@ app.get('/api/catalog/actors', asyncRoute(async (req, res) => {
  * trùng tên và người trùng tên, để trang tìm kiếm gợi ý được "phim có diễn viên
  * X" mà không cần người dùng biết trước phải bấm vào đâu.
  */
-app.get('/api/search', asyncRoute(async (req, res) => {
+app.get('/api/search', serverCachedRoute(30, catalogKey('search'), async (req) => {
   const query = z.object({
     q: z.string().trim().min(1).max(100),
     page: z.coerce.number().int().min(1).max(500).default(1),
@@ -266,7 +266,7 @@ app.get('/api/search', asyncRoute(async (req, res) => {
     listMovies({ q: query.q, page: query.page, limit: query.limit, sort: 'recent' }),
     listPeople({ q: query.q, page: 1, limit: 8 })
   ]);
-  res.json({ query: query.q, movies, people: people.items });
+  return { query: query.q, movies, people: people.items };
 }));
 
 app.get('/api/movies/:slug', asyncRoute(async (req, res) => { await respondWithMovie(req, res, slugSchema.parse(req.params.slug)); }));
@@ -302,7 +302,12 @@ app.get('/api/sync/status', asyncRoute(async (_req, res) => res.json(await getSy
 app.post('/api/sync/start', asyncRoute(async (req, res) => {
   const state = await getSyncState(); if ((state as any)?.status === 'running') return res.status(409).json(state);
   const pages = z.object({ pages: z.number().int().min(1).max(20).optional() }).parse(req.body ?? {});
-  void syncLatest(pages.pages).catch((error) => console.error('Catalog sync failed:', error)); res.status(202).json({ started: true });
+  // Sync xong thì mở lại các ngăn catalog/movies để dải "Mới cập nhật" thấy phim mới ngay.
+  void syncLatest(pages.pages)
+    .then(() => cacheInvalidate('web:catalog:'))
+    .then(() => cacheInvalidate('web:movies'))
+    .catch((error) => console.error('Catalog sync failed:', error));
+  res.status(202).json({ started: true });
 }));
 /**
  * Nhập lại một phim theo yêu cầu (nút "Làm mới nguồn"). Route này **có** chờ: người
@@ -320,6 +325,7 @@ app.post('/api/import/:slug', asyncRoute(async (req, res) => {
   } finally {
     forgetImport(slug);
   }
+  await cacheInvalidate('web:movies');
   res.json({ movie: await getMovie(slug, true) });
 }));
 // Tìm trực tiếp ở VSMOV, bỏ qua kho đã lưu.

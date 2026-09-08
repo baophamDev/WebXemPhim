@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
-import { clean, BackToTop, ErrorState, image, MovieRow, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
+import { clean, BackToTop, ErrorState, HeroPanelBeam, image, MovieRow, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
 import type { Movie } from '../types';
 
 /**
@@ -77,7 +77,8 @@ export default function Home() {
               <HeroTitle name={featured.name} />
               <FavoriteButton movie={featured} />
             </div>
-            <aside className="hero-panel">
+            <HeroPanelBeam>
+            <aside className="hero-panel hero-panel--beam">
               <span className="hero-eyebrow">{featured.originName || 'Mới về kho'}</span>
               <Spec movie={featured} />
               <p className="description">{clean(featured.description) || `Xem ${featured.name} ngay trên kho phim của gia đình.`}</p>
@@ -87,6 +88,7 @@ export default function Home() {
               </div>
               <NextUp items={next} />
             </aside>
+            </HeroPanelBeam>
           </div>
         </section>
       : <div className="hero-skeleton" />}

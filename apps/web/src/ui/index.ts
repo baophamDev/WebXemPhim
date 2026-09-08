@@ -15,3 +15,4 @@ export { EmptyState, ErrorState, RouteFallback, SkeletonGrid, SyncStatus } from 
 export { BackToTop, Breadcrumb, Pagination } from './nav';
 export { ImportPanel, TopProgress, useImportProgress, type ImportProgress } from './progress';
 export { ThemePicker } from './pickers';
+export { HeroPanelBeam } from './beam';

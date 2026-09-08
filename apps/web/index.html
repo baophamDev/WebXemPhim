@@ -90,6 +90,12 @@
       })();
     </script>
 
+    <!-- Mở sẵn kết nối tới host ảnh (poster/thumb hotlink từ nguồn phim).
+         Ảnh là thứ nặng nhất trang chủ: không có preconnect thì mỗi ảnh đầu
+         phải trả thêm DNS + TCP + TLS trước khi tải được byte nào. Host này
+         khác origin API nên dòng preconnect API ở trên không cover được. -->
+    <link rel="preconnect" href="https://vsmov.com" crossorigin />
+
     <!-- Font tải qua <link> chứ không @import trong CSS: @import chặn render vì
          trình duyệt phải tải xong CSS mới biết cần font nào.
          Anton chỉ dùng cho tiêu đề hero khổ lớn (có subset vietnamese). -->

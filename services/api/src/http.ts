@@ -4,6 +4,7 @@
  * `test/http.test.js` gọi trực tiếp với req/res giả.
  */
 import type express from 'express';
+import { cacheGet, cacheSet } from './cache.js';
 
 /**
  * Bắt lỗi của handler async và đẩy sang middleware lỗi của Express.
@@ -36,5 +37,42 @@ export const cachedRoute = (seconds: number, load: (req: express.Request) => Pro
     const body = await load(req);
     res.header('Cache-Control', `public, max-age=${seconds}, stale-while-revalidate=${seconds * 5}`);
     res.header('Vary', 'Origin');
+    res.json(body);
+  });
+
+/**
+ * `cachedRoute` + thêm một lớp cache ở server (Redis, lùi về RAM).
+ *
+ * Trình duyệt giữ bản của riêng nó, còn đây giữ bản dùng chung cho mọi client:
+ * request đầu sau khi hết hạn trả tiền tính toán một lần, các request sau trong
+ * vòng TTL ăn `X-Cache: HIT` mà không chạm Postgres hay nguồn ngoài.
+ *
+ * `keyOf` phải chứa mọi tham số làm đổi câu trả lời (dùng `routeKey` trong
+ * `cache.ts`). Lỗi loader thì throw trước khi set — không có nhánh nào cache
+ * được lỗi, giống luật của `cachedRoute`.
+ */
+export const serverCachedRoute = (
+  seconds: number,
+  keyOf: (req: express.Request) => string,
+  load: (req: express.Request) => Promise<unknown>
+) =>
+  asyncRoute(async (req, res) => {
+    const key = keyOf(req);
+    const hit = await cacheGet(key);
+    if (hit !== null) {
+      try {
+        res.header('Cache-Control', `public, max-age=${seconds}, stale-while-revalidate=${seconds * 5}`);
+        res.header('Vary', 'Origin');
+        res.header('X-Cache', 'HIT');
+        return res.json(JSON.parse(hit));
+      } catch {
+        // Bản cache hỏng (JSON vỡ) thì tính lại như MISS, không gãy request.
+      }
+    }
+    const body = await load(req);
+    await cacheSet(key, JSON.stringify(body), seconds);
+    res.header('Cache-Control', `public, max-age=${seconds}, stale-while-revalidate=${seconds * 5}`);
+    res.header('Vary', 'Origin');
+    res.header('X-Cache', 'MISS');
     res.json(body);
   });

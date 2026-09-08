@@ -209,18 +209,19 @@ img { max-width: 100%; }
    dòng gợi ý trong ô tìm kiếm chìm hẳn. Ép opacity 1 để nó đúng màu token. */
 input::placeholder { color: var(--ink-faint); opacity: 1; }
 
-/* Góc xoay của dải led khung ngoài. `@property` để gradient conic xoay được bằng
-   animation (trình duyệt cũ không hiểu thì viền đứng yên ở 0deg, vẫn hiện). */
+/* Góc xoay aurora cũ đã nghỉ hưu cùng viền xoay của khung ngoài (xem .app-frame):
+   chuyển động giờ do lib border-beam vẽ trên hero-panel. Giữ @property để mọi
+   gradient còn đọc var(--aurora-angle) không gãy trong trình duyệt cũ. */
 @property --aurora-angle {
   syntax: '<angle>';
   initial-value: 0deg;
   inherits: false;
 }
-@keyframes aurora-spin { to { --aurora-angle: 360deg; } }
 
-/* Khung ngoài: cả trang là một tấm poster bo góc, có lề, dựng trên nền tối
-   hơn. Viền led aurora dày xoay liên tục quanh khung. `overflow: clip` để ảnh
-   hero tự bị cắt theo góc bo của khung. */
+/* Khung ngoài: viền aurora để TĨNH có chủ ý. Bản cũ xoay conic-gradient bằng
+   `@property` mỗi frame là repaint toàn bộ khung hình — máy yếu giật, trình
+   duyệt cũ không có `@property` thì đứng yên. Chuyển động giờ chỉ còn trên
+   hero-panel (lib border-beam vẽ), khung giữ gradient tĩnh cho nhẹ. */
 .app-frame {
   position: relative; display: flex; flex-direction: column;
   min-height: calc(100vh - var(--frame-gap) * 2);
@@ -228,9 +229,8 @@ input::placeholder { color: var(--ink-faint); opacity: 1; }
   border: 2.5px solid transparent; border-radius: var(--r-frame); overflow: clip;
   background:
     linear-gradient(var(--void), var(--void)) padding-box,
-    conic-gradient(from var(--aurora-angle), #ff5f1f, #ffb52e, #fff6dd, #ffb52e, #ff5f1f) border-box;
+    conic-gradient(from 24deg, #ff5f1f, #ffb52e, #fff6dd, #ffb52e, #ff5f1f) border-box;
   box-shadow: 0 0 44px rgba(255, 106, 31, .14);
-  animation: aurora-spin 9s linear infinite;
 }
 
 h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: uppercase; letter-spacing: .01em; }
@@ -443,15 +443,27 @@ main.flush { padding-top: 0; }
 .hero-panel {
   padding: clamp(18px, 2vw, 26px); border-radius: var(--r);
   border: 1.5px solid transparent;
-  background: linear-gradient(var(--glass), var(--glass)) padding-box, var(--aurora) border-box;
+  background: linear-gradient(rgb(var(--veil) / .38), rgb(var(--veil) / .38)) padding-box, var(--aurora) border-box;
   background-size: 100% 100%, 220% 220%;
-  backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   box-shadow: 0 0 28px rgba(255, 106, 31, .22);
   animation: rise .5s cubic-bezier(.2, .7, .3, 1) both, aurora-flow 7s linear infinite;
 }
 /* Dải led chảy vòng quanh viền: chỉ lớp border-box (lớp thứ hai) di chuyển,
-   lớp nền đặc đứng yên nên panel không bị nhấp nháy. */
+   lớp nền đặc đứng yên nên panel không bị nhấp nháy. Giữ lại cho các panel
+   không dùng lib; riêng hero-panel dùng border-beam thì xem variant --beam. */
 @keyframes aurora-flow { from { background-position: 0 0, 0% 0%; } to { background-position: 0 0, 220% 220%; } }
+/* Wrapper của lib border-beam: thay aside thành grid item của .hero-layout nên
+   phải co được như panel cũ, và giữ nhịp trồi lên .16s của chuỗi mở màn. */
+.hero-beam { min-width: 0; animation: rise .5s cubic-bezier(.2, .7, .3, 1) .16s both; }
+/* Panel dùng lib vẽ viền động: bỏ viền aurora + animation tay để khỏi đè hai
+   lớp chuyển động lên nhau (đúng lỗi "thô" trên mobile), chỉ giữ kính mờ. */
+.hero-panel--beam {
+  background: linear-gradient(rgb(var(--veil) / .38), rgb(var(--veil) / .38));
+  border: 1.5px solid rgb(var(--veil) / .38);
+  animation: none;
+}
 .hero-panel .spec { margin-bottom: 14px; }
 .hero-panel .description { max-width: none; margin-bottom: 18px; }
 .hero-panel .actions { margin-bottom: 4px; }
