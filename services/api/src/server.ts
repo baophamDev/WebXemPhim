@@ -133,6 +133,22 @@ async function refreshPeopleThumbs() {
 }
 
 /**
+ * VSMOV chặn một số IP datacenter (Railway bị 403) nên trang chủ không được phép
+ * phụ thuộc hoàn toàn vào provider: nguồn chết thì trả dải phim gần nhất trong DB
+ * — giống `taxonomyWithFallback`, trang chủ trắng là thứ người dùng nhìn thấy đầu tiên.
+ */
+async function homeWithFallback(filters: CatalogFilters) {
+  try {
+    const remote = await catalog.home(filters);
+    if (remote.items.length) return remote;
+  } catch (error) {
+    console.warn('VSMOV không trả lời trang chủ, chuyển sang DB:', (error as Error).message);
+  }
+  const page = await listMovies({ page: filters.page ?? 1, limit: filters.limit ?? 24, sort: 'recent' });
+  return { ...page, source: 'database' as const };
+}
+
+/**
  * Taxonomy ưu tiên VSMOV (có slug chuẩn để gọi tiếp), VSMOV chết thì
  * dựng từ DB để menu điều hướng không bao giờ trắng.
  */
@@ -177,7 +193,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-ci
  * đọc bảng nhỏ nên vốn đã nhanh.
  */
 const catalogKey = (prefix: string) => (req: express.Request) => routeKey(prefix, { ...req.query, ...req.params });
-app.get('/api/catalog/home', serverCachedRoute(60, catalogKey('catalog:home'), (req) => catalog.home(queryFilters(req.query))));
+app.get('/api/catalog/home', serverCachedRoute(60, catalogKey('catalog:home'), (req) => homeWithFallback(queryFilters(req.query))));
 app.get('/api/catalog/lists/:slug', serverCachedRoute(60, catalogKey('catalog:list'), (req) => catalog.listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query))));
 app.get('/api/catalog/search', serverCachedRoute(30, catalogKey('catalog:search'), (req) => catalog.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
 app.get('/api/catalog/genres', serverCachedRoute(600, catalogKey('catalog:genres'), () => taxonomyWithFallback(() => catalog.genres(), listGenresFromDb)));

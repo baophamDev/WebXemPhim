@@ -101,12 +101,13 @@ API Railway cũng tự kiểm tra/tạo schema khi khởi động. Chạy migrat
 
 1. Trong Supabase Dashboard, chọn **Connect**.
 2. Tìm phần connection string dành cho PostgreSQL.
-3. Chọn **Transaction pooler** hoặc chế độ pooler tương đương.
-4. Sao chép chuỗi URI. Chuỗi thường có dạng:
+3. Chọn **Session pooler** (port 5432) hoặc **Transaction pooler** (port 6543). Chuỗi URI có dạng:
 
 ```text
-postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
+postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres
 ```
+
+Port 5432 là session pooler (mỗi kết nối một session — đúng cách `postgres.js` của API này dùng). Port 6543 là transaction pooler; dùng được nhưng chuẩn bị statement đơn giản và một số lệnh DDL/migration có thể gặp giới hạn.
 
 5. Thay phần password bằng database password đã tạo ở bước 3.1.
 
@@ -145,15 +146,12 @@ Health check: /api/health
 Trong Railway service, mở **Variables** và thêm từng biến:
 
 ```env
-DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
+# Pooler (không dùng db.<ref>.supabase.co — IPv6-only, Railway không nối được).
+# Project ở region nào thì dùng region đó (vd ap-northeast-1 = Tokyo).
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
-CATALOG_SOURCES=vsmov,motchillu,motchillv,phim4k,phimmoichill,phimmoichill-win,vieflix,tmdb,tvdb
 VSMOV_API_URL=https://vsmov.com/api
-TMDB_ACCESS_TOKEN=token-v4-cua-themoviedb
-TMDB_LANGUAGE=vi-VN
-TVDB_API_KEY=khoa-cua-thetvdb
-TVDB_LANGUAGE=vie
 WEB_ORIGIN=http://localhost:5173
 HOST=0.0.0.0
 ```
@@ -590,8 +588,9 @@ Chưa thêm `DATABASE_URL` vào Railway Variables hoặc tên biến bị viết
 
 Kiểm tra:
 
+- **Không dùng host `db.<ref>.supabase.co`**: từ 2026 host direct connection của Supabase chỉ còn bản ghi IPv6, trong khi Railway chỉ có egress IPv4 — log sẽ lặp `connect ENETUNREACH ...:5432` mãi mãi. Phải dùng pooler `aws-0-<region>.pooler.supabase.com` (chỉ IPv4).
 - Đã dùng Transaction Pooler URI chưa.
-- Password có đúng không.
+- Password có đúng không. Đổi password trong Supabase (Project Settings → Database → Reset database password) thì phải cập nhật lại cả `DATABASE_URL` trên Railway lẫn `.env` local.
 - Password có ký tự đặc biệt chưa URL-encode không.
 - `DATABASE_SSL=true` đã được đặt chưa.
 - Supabase project có đang bị pause không.
