@@ -272,7 +272,7 @@ Sai:  https://example.up.railway.app/api/
 2. Sau khi build thành công, Vercel cấp domain tương tự:
 
 ```text
-https://bao-nhan-cinema.vercel.app
+https://xemphimhoi.vercel.app
 ```
 
 3. Mở website. Ở thời điểm này giao diện có thể xuất hiện nhưng request API có thể bị CORS chặn vì Railway chưa biết domain Vercel.
@@ -282,19 +282,19 @@ https://bao-nhan-cinema.vercel.app
 Quay lại Railway → **Variables**, đổi `WEB_ORIGIN` thành domain Vercel thật:
 
 ```env
-WEB_ORIGIN=https://bao-nhan-cinema.vercel.app
+WEB_ORIGIN=https://xemphimhoi.vercel.app
 ```
 
 Nếu muốn cho phép cả website production và local development, phân cách bằng dấu phẩy:
 
 ```env
-WEB_ORIGIN=https://bao-nhan-cinema.vercel.app,http://localhost:5173
+WEB_ORIGIN=https://xemphimhoi.vercel.app,http://localhost:5173
 ```
 
 Nếu có custom domain:
 
 ```env
-WEB_ORIGIN=https://baonhancinema.com,https://bao-nhan-cinema.vercel.app,http://localhost:5173
+WEB_ORIGIN=https://baonhancinema.com,https://xemphimhoi.vercel.app,http://localhost:5173
 ```
 
 Sau khi lưu, Railway sẽ redeploy/restart service. Chờ API health hoạt động lại rồi refresh website Vercel.
@@ -302,8 +302,8 @@ Sau khi lưu, Railway sẽ redeploy/restart service. Chờ API health hoạt đ�
 Domain phải khớp chính xác giao thức và hostname. Không thêm đường dẫn `/api` vào `WEB_ORIGIN`.
 
 ```text
-Đúng: https://bao-nhan-cinema.vercel.app
-Sai:  https://bao-nhan-cinema.vercel.app/api
+Đúng: https://xemphimhoi.vercel.app
+Sai:  https://xemphimhoi.vercel.app/api
 Sai:  bao-nhan-cinema.vercel.app
 ```
 
