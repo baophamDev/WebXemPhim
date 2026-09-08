@@ -149,6 +149,38 @@ async function homeWithFallback(filters: CatalogFilters) {
 }
 
 /**
+ * Các danh sách có sẵn của VSMOV ánh xạ về bộ lọc DB tương đương, để rail
+ * "Phim bộ / Phim lẻ / 4K" trên trang chủ không trắng khi provider chặn IP server.
+ */
+const LIST_FILTERS: Record<string, { type?: string; sort?: 'recent' | 'year' | 'rating' }> = {
+  'phim-moi-cap-nhat': { sort: 'recent' },
+  'phim-le': { type: 'single' },
+  'phim-bo': { type: 'series' },
+  'dang-chieu': { sort: 'year' },
+  '4k': { sort: 'rating' },
+  'long-tieng': { sort: 'recent' },
+  'thuyet-minh': { sort: 'recent' },
+  subteam: { sort: 'recent' }
+};
+
+async function listWithFallback(slug: string, filters: CatalogFilters) {
+  try {
+    const remote = await catalog.listBySlug(slug, filters);
+    if (remote.items.length) return remote;
+  } catch (error) {
+    console.warn(`VSMOV không trả lời danh sách "${slug}", chuyển sang DB:`, (error as Error).message);
+  }
+  const mapped = LIST_FILTERS[slug] ?? { sort: 'recent' as const };
+  const year = filters.year ? Number(filters.year) : undefined;
+  const page = await listMovies({
+    page: filters.page ?? 1, limit: filters.limit ?? 24,
+    type: mapped.type, sort: mapped.sort ?? 'recent',
+    year: Number.isFinite(year) ? year : undefined, genre: filters.category, country: filters.country
+  });
+  return { ...page, source: 'database' as const };
+}
+
+/**
  * Taxonomy ưu tiên VSMOV (có slug chuẩn để gọi tiếp), VSMOV chết thì
  * dựng từ DB để menu điều hướng không bao giờ trắng.
  */
@@ -194,7 +226,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'bao-nhan-ci
  */
 const catalogKey = (prefix: string) => (req: express.Request) => routeKey(prefix, { ...req.query, ...req.params });
 app.get('/api/catalog/home', serverCachedRoute(60, catalogKey('catalog:home'), (req) => homeWithFallback(queryFilters(req.query))));
-app.get('/api/catalog/lists/:slug', serverCachedRoute(60, catalogKey('catalog:list'), (req) => catalog.listBySlug(slugSchema.parse(req.params.slug), queryFilters(req.query))));
+app.get('/api/catalog/lists/:slug', serverCachedRoute(60, catalogKey('catalog:list'), (req) => listWithFallback(slugSchema.parse(req.params.slug), queryFilters(req.query))));
 app.get('/api/catalog/search', serverCachedRoute(30, catalogKey('catalog:search'), (req) => catalog.search(z.string().trim().min(2).max(100).parse(req.query.q), queryFilters(req.query))));
 app.get('/api/catalog/genres', serverCachedRoute(600, catalogKey('catalog:genres'), () => taxonomyWithFallback(() => catalog.genres(), listGenresFromDb)));
 app.get('/api/catalog/genres/:slug', serverCachedRoute(60, catalogKey('catalog:genre'), (req) => catalog.byGenre(slugSchema.parse(req.params.slug), queryFilters(req.query))));
