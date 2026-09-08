@@ -209,14 +209,28 @@ img { max-width: 100%; }
    dòng gợi ý trong ô tìm kiếm chìm hẳn. Ép opacity 1 để nó đúng màu token. */
 input::placeholder { color: var(--ink-faint); opacity: 1; }
 
+/* Góc xoay của dải led khung ngoài. `@property` để gradient conic xoay được bằng
+   animation (trình duyệt cũ không hiểu thì viền đứng yên ở 0deg, vẫn hiện). */
+@property --aurora-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes aurora-spin { to { --aurora-angle: 360deg; } }
+
 /* Khung ngoài: cả trang là một tấm poster bo góc, có lề, dựng trên nền tối
-   hơn. `overflow: clip` để ảnh hero tự bị cắt theo góc bo của khung. */
+   hơn. Viền led aurora dày xoay liên tục quanh khung. `overflow: clip` để ảnh
+   hero tự bị cắt theo góc bo của khung. */
 .app-frame {
   position: relative; display: flex; flex-direction: column;
   min-height: calc(100vh - var(--frame-gap) * 2);
   margin: var(--frame-gap);
-  background: var(--void); border: 1px solid var(--edge);
-  border-radius: var(--r-frame); overflow: clip;
+  border: 2.5px solid transparent; border-radius: var(--r-frame); overflow: clip;
+  background:
+    linear-gradient(var(--void), var(--void)) padding-box,
+    conic-gradient(from var(--aurora-angle), #ff5f1f, #ffb52e, #fff6dd, #ffb52e, #ff5f1f) border-box;
+  box-shadow: 0 0 44px rgba(255, 106, 31, .14);
+  animation: aurora-spin 9s linear infinite;
 }
 
 h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: uppercase; letter-spacing: .01em; }
