@@ -73,10 +73,11 @@ function Header() {
   </header>;
 }
 
-export function Shell({ children, flush = false }: { children: ReactNode; flush?: boolean }) {
+export function Shell({ children, flush = false, backdrop }: { children: ReactNode; flush?: boolean; backdrop?: ReactNode }) {
   return <div className={flush ? 'app-frame flush' : 'app-frame'}>
     <NavigationEffects />
     <Header />
+    {backdrop}
     <main className={flush ? 'flush' : ''}>{children}</main>
     <footer>
       <Logo />

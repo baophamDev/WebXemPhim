@@ -20,10 +20,10 @@
   --track: #6b503c;
 
   --ink: #f7f0e7;
-  --ink-dim: #bda98f;
+  --ink-dim: #fcfcfc;
   /* 4.79:1 trên --void. Ở #86705c cũ chỉ được 4.27:1, mà token này toàn dùng cho
      nhãn 11px — cỡ chữ nhỏ nhất trong giao diện, nơi cần đủ 4.5:1 nhất. */
-  --ink-faint: #8f7863;
+  --ink-faint: #863b37;
 
   /* Một màu nóng duy nhất cho hành động chính, một màu cam cho điểm nhấn. */
   --amber: #ffc53d;
@@ -207,7 +207,7 @@ img { max-width: 100%; }
 :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 /* Placeholder: màu sáng hơn chữ mờ một bậc để gợi ý tìm kiếm đọc được ngay,
    opacity 1 để không bị trình duyệt phủ thêm lớp mờ mặc định. */
-input::placeholder { color: var(--ink-dim); opacity: 1; }
+input::placeholder { color: var(--ink-dim); opacity: 0.5; }
 
 /* Góc xoay aurora cũ đã nghỉ hưu cùng viền xoay của khung ngoài (xem .app-frame):
    chuyển động giờ do lib border-beam vẽ trên hero-panel. Giữ @property để mọi
@@ -395,11 +395,19 @@ main.flush { padding-top: 0; }
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: 62% 18%;
 }
+/* Nền hero tách khỏi luồng nội dung: ảnh nằm tuyệt đối phía trên khung, còn
+   main chỉ chứa hero-content + page-container. Đáy nền tan thẳng sang trong
+   suốt nên tự liền với nền trang ở cả hai theme, không cần canh màu fade. */
+.hero-backdrop { position: absolute; inset: 0 0 auto 0; z-index: 0; height: min(760px, 94vh); overflow: clip; }
+.hero-content { position: relative; z-index: 1; }
+.hero-content .hero-layout { min-height: min(720px, 84vh); }
+/* Đáy nền tan vào trong suốt: mép dưới vô hình, giữa tối vừa để chữ đọc được,
+   trên cùng trong để lộ header. Lớp chéo trái giữ nguyên cho tiêu đề. */
 .hero-veil {
   position: absolute; inset: 0;
   background:
     linear-gradient(100deg, rgb(var(--veil) / .82) 0%, rgb(var(--veil) / .45) 32%, rgb(var(--veil) / .06) 58%, transparent 74%),
-    linear-gradient(0deg, rgb(var(--veil) / .78) 0%, transparent 36%);
+    linear-gradient(0deg, transparent 0%, rgb(var(--veil) / .55) 34%, transparent 68%);
 }
 .hero-layout {
   position: relative; width: min(1440px, 100%); margin: 0 auto;
@@ -1120,6 +1128,9 @@ footer > div a:hover { color: var(--amber); }
   .picker-menu, .picker-menu.compact { width: min(272px, calc(100vw - 2 * var(--pad-x))); }
   body.menu-open { overflow: hidden; }
   .hero, .detail-hero { min-height: 76vh; }
+  /* Mobile xếp dọc nên nội dung cao hơn: nền kéo dài theo, không để panel thò ra khỏi ảnh. */
+  .hero-backdrop { height: min(1200px, 162vh); }
+  .hero-content .hero-layout { min-height: 72vh; }
   .hero-layout { padding-top: calc(var(--header-h) + 20px); }
   .hero-copy, .detail-copy { width: 100%; }
   .detail-copy { padding: 0 var(--pad-x) clamp(28px, 4vh, 48px); }
