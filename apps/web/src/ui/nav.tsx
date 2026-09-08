@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { stillMotion } from './format';
+import { smoothScrollTo } from './smooth';
 
 export function Breadcrumb({ items }: { items: [string, string][] }) {
   return <nav className="breadcrumb" aria-label="Đường dẫn">
@@ -35,7 +36,7 @@ export function BackToTop() {
     return () => { removeEventListener('scroll', queue); cancelAnimationFrame(frame); };
   }, []);
   if (!show) return null;
-  return <button className="to-top" type="button" onClick={() => scrollTo({ top: 0, behavior: stillMotion() ? 'auto' : 'smooth' })}>
+  return <button className="to-top" type="button" onClick={() => smoothScrollTo(0, { immediate: stillMotion() })}>
     <ArrowUp /><span>Đầu trang</span>
   </button>;
 }

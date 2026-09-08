@@ -43,7 +43,7 @@
   --aurora-glow: 0 0 0 1px rgba(255, 197, 61, .55), 0 12px 36px rgba(255, 106, 31, .45);
 
   /* Kính mờ: panel thông tin bên phải hero nằm trên ảnh nên phải tự sáng. */
-  --glass: rgba(23, 16, 11, .62);
+  --glass: rgba(83, 76, 71, 0.62);
   --glass-edge: rgba(255, 197, 61, .16);
 
   --f-poster: 'Anton', 'Chakra Petch', 'Arial Narrow', sans-serif;
@@ -262,7 +262,8 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: up
 }
 /* Header nổi trên hero/detail cũng thuộc "sân khấu tối" ở light mode: chữ tối
    trên ảnh tối là không đọc được, nên ép cả thanh về token tối. */
-:root[data-theme='light'] .app-frame.flush .app-header {
+:root[data-theme='light'] .app-frame.flush .app-header,
+:root[data-theme='light'] .home-bg .app-header {
   color: #f7f0e7;
   --ink: #f7f0e7;
   --ink-dim: #e3d3bd;
@@ -388,7 +389,7 @@ main.flush { padding-top: 0; }
 .route-fallback, .full-loader { display: grid; place-items: center; min-height: 60vh; color: var(--ink-faint); }
 
 /* --- Hero: ảnh phủ kín khung, chữ khổ lớn bên trái, panel kính bên phải -- */
-.hero { position: relative; min-height: min(720px, 84vh); display: flex; align-items: flex-end; overflow: hidden; }
+.hero { position: flex; min-height: min(720px, 84vh); display: flex; align-items: flex-end; overflow: hidden; }
 /* Ảnh hero là <img> chứ không phải background-image: trình duyệt phát hiện
    được nó là ảnh lớn nhất và ưu tiên tải, LCP xuống rõ rệt. */
 .hero-media, .detail-media {
@@ -406,8 +407,8 @@ main.flush { padding-top: 0; }
 .hero-veil {
   position: absolute; inset: 0;
   background:
-    linear-gradient(100deg, rgb(var(--veil) / .82) 0%, rgb(var(--veil) / .45) 32%, rgb(var(--veil) / .06) 58%, transparent 74%),
-    linear-gradient(0deg, transparent 0%, rgb(var(--veil) / .55) 34%, transparent 68%);
+    /* linear-gradient(100deg, rgb(var(--veil) / .82) 0%, rgb(var(--veil) / .45) 32%, rgb(var(--veil) / .06) 58%, transparent 74%), */
+    /* linear-gradient(0deg, transparent 0%, rgb(var(--veil) / .55) 34%, transparent 68%); */
 }
 .hero-layout {
   position: relative; width: min(1440px, 100%); margin: 0 auto;
@@ -471,6 +472,47 @@ main.flush { padding-top: 0; }
 .gsap-on .hero-media,
 .gsap-on .hero-copy > *,
 .gsap-on .hero-beam { animation: none; }
+/* Lớp phủ tối + mờ trên hero, GSAP scrub opacity 0→1 khi sheet trượt lên.
+   Không bắt pointer để nút Phát/Chi tiết dưới nó vẫn bấm được lúc chưa tối. */
+.hero-overlay {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0;
+  background: rgba(0, 0, 0, .6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  will-change: opacity;
+}
+/* Trang chủ pin: header + hero RỜI KHỎI khung viền, dựng full-bleed làm lớp
+   nền fixed cao đúng một màn hình; khung viền aurora (`.home-frame`) chỉ bọc từ
+   sheet trở xuống và trượt lên che nền khi cuộn. Toàn bộ nằm sau `.pin-on` nên
+   không có JS / giảm motion / màn hẹp thì về flow thường. */
+.home-bg {
+  position: fixed; inset: 0 0 auto 0; height: 100vh; height: 100svh;
+  z-index: 0; overflow: clip;
+}
+/* Header nổi trên hero như bản flush cũ: gradient tắt dần, không viền đáy,
+   luôn nằm trên overlay (z 10) nên vẫn bấm được khi hero tối đi. */
+.home-bg .app-header {
+  position: absolute; inset: 0 0 auto 0; z-index: 10; min-height: var(--header-h);
+  background: linear-gradient(rgb(var(--veil) / .72), rgb(var(--veil) / 0)); border-bottom: 0;
+}
+.home-bg .hero { height: 100vh; height: 100svh; min-height: 0; }
+.home-frame { position: relative; z-index: 1; margin-top: 100vh; margin-top: 100svh; }
+
+/* Lenis: khi bị stop (menu đang mở) thì khoá cuộn nền lại, nếu không thanh
+   cuộn gốc vẫn trôi khi người dùng lăn chuột lên phần đã fixed. */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-stopped { overflow: clip; }
+.lenis.lenis-smooth iframe { pointer-events: none; }
+/* Sheet nội dung nổi lên che hero: nền đặc + bo góc trên + viền để đọc rõ là
+   một tấm thẻ tách khỏi nền, kèm bóng đổ xuống hero. */
+.pin-on .home-sheet {
+  position: relative; z-index: 5;
+  background: var(--void);
+  border: 1px solid var(--edge);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -24px 60px rgba(0, 0, 0, .45);
+}
 /* Panel dùng lib vẽ viền động: bỏ viền aurora + animation tay để khỏi đè hai
    lớp chuyển động lên nhau (đúng lỗi "thô" trên mobile), chỉ giữ kính mờ. */
 .hero-panel--beam {
@@ -1142,6 +1184,13 @@ footer > div a:hover { color: var(--amber); }
   .detail-copy { padding: 0 var(--pad-x) clamp(28px, 4vh, 48px); }
   .hero-title { font-size: clamp(34px, 11vw, 68px); text-wrap: balance; }
   .hero-panel { padding: 18px; }
+  /* Màn hẹp: nội dung hero xếp dọc cao hơn viewport nên không ghim fixed được
+     (sẽ kẹp mất nút). Về flow thường: nền relative, hero cao tự nhiên, khung
+     nằm sát ngay dưới, sheet chỉ còn là tấm thẻ bo góc. */
+  .pin-on .home-bg { position: relative; height: auto; }
+  .pin-on .home-bg .hero { height: auto; min-height: 76vh; }
+  .pin-on .home-frame { margin-top: 0; }
+  .pin-on .home-sheet { border-radius: 16px 16px 0 0; }
   .next-grid { grid-template-columns: 1fr 1fr; }
   .page-top { padding-top: 28px; }
   .page-title { align-items: flex-start; flex-direction: column; gap: 16px; }

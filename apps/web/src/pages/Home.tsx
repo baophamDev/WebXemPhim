@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
-import { clean, BackToTop, ErrorState, image, RailLabel, Shell, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
+import { clean, BackToTop, ErrorState, Header, image, NavigationEffects, RailLabel, Shell, SiteFooter, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
 import { HeroPanelBeam } from '../ui/beam';
 import { MovieRow } from '../ui/Rail';
-import { useHeroEntrance } from '../ui/motion';
-import type { Movie } from '../types';
+import { useHeroEntrance, useHeroPin, useSmoothScroll } from '../ui/motion';
+import type { Movie, MovieList } from '../types';
 
 /**
  * Tiêu đề hero: từ cuối đổi sang màu cam. Phim Việt hay có số phần ở cuối
@@ -59,6 +59,8 @@ function Hero({ featured, next, warm }: { featured: Movie; next: Movie[]; warm: 
     {/* fetchPriority + không lazy: đây là ảnh LCP của trang chủ. */}
     <img data-motion="media" className="hero-media" src={image(featured, true) || '/poster-placeholder.svg'} alt="" fetchPriority="high" decoding="async" />
     <div className="hero-veil" />
+    {/* Lớp phủ tối + mờ dần khi sheet nội dung trượt lên che hero (GSAP scrub). */}
+    <div className="hero-overlay" aria-hidden="true" />
     <div className="hero-layout">
       <div className="hero-copy" data-motion="copy">
         <span className="hero-eyebrow">{featured.genres?.[0] ?? 'Đang nổi'} · {featured.type === 'series' || featured.type === 'tv' ? 'Phim bộ' : 'Phim lẻ'}</span>
@@ -100,20 +102,58 @@ export default function Home() {
   if (home.isError && !featured) {
     return <Shell><div className="page-container page-top"><ErrorState onRetry={home.refetch} /></div></Shell>;
   }
-  return <Shell flush>
-    {featured
-      ? <Hero featured={featured} next={next} warm={warm} />
-      : <div className="hero-skeleton" />}
-    <div className="page-container page-top">
-      <SyncStatus />
-      {home.isLoading
-        ? <SkeletonGrid />
-        : <MovieRow label="Mới cập nhật" title="Vừa thêm vào kho" items={items} to="/browse/list/phim-moi-cap-nhat" />}
-      <MovieRow label="Điểm cao" title="Đáng xem nhất" items={top} to="/browse/list/phim-moi-cap-nhat?sort=rating" ranked />
-      <MovieRow label="Phim bộ" title="Xem dài hơi" items={series.data?.items ?? []} to="/browse/list/phim-bo" />
-      <MovieRow label="Phim lẻ" title="Xem một buổi" items={movies.data?.items ?? []} to="/browse/list/phim-le" />
-      <MovieRow label="Chất lượng" title="Bản 4K" items={ultra.data?.items ?? []} to="/browse/list/4k" />
+  // Chưa có phim nổi bật thì giữ layout khung thường (skeleton trong Shell).
+  if (!featured) {
+    return <Shell flush>
+      <div className="hero-skeleton" />
+      <div className="page-container page-top">
+        <SyncStatus />
+        <SkeletonGrid />
+      </div>
+      <BackToTop />
+    </Shell>;
+  }
+  return <HomePinned featured={featured} next={next} warm={warm} home={home} series={series} movies={movies} ultra={ultra} items={items} top={top} />;
+}
+
+/**
+ * Layout trang chủ khi đã có hero: header + hero RỜI KHỎI khung viền, dựng
+ * full-bleed làm lớp nền; khung viền aurora (`.home-frame`) chỉ bọc từ sheet
+ * nội dung trở xuống và trượt lên che hero khi cuộn.
+ *
+ * Thứ tự lớp: `.home-bg` fixed đứng yên → `.home-frame` relative + margin-top
+ * đẩy xuống dưới viewport → cuộn thì frame phủ lên nền. Chỉ bật khi đã có
+ * `featured`; skeleton/error đi nhánh Shell thường ở trên.
+ */
+function HomePinned({ featured, next, warm, home, series, movies, ultra, items, top }: {
+  featured: Movie; next: Movie[]; warm: (movie: Movie) => () => void;
+  home: { isLoading: boolean }; series: { data?: MovieList }; movies: { data?: MovieList }; ultra: { data?: MovieList };
+  items: Movie[]; top: Movie[];
+}) {
+  const pin = useHeroPin<HTMLDivElement>(true, [featured.slug, items.length]);
+  const smooth = useSmoothScroll<HTMLDivElement>(true, [featured.slug, items.length]);
+  const homeRef = (node: HTMLDivElement | null) => { pin.current = node; smooth.current = node; };
+  return <div className="home" ref={homeRef}>
+    <NavigationEffects />
+    <div className="home-bg">
+      <Header />
+      <Hero featured={featured} next={next} warm={warm} />
+    </div>
+    <div className="app-frame home-frame">
+      <main>
+        <div className="page-container page-top home-sheet">
+          <SyncStatus />
+          {home.isLoading
+            ? <SkeletonGrid />
+            : <MovieRow label="Mới cập nhật" title="Vừa thêm vào kho" items={items} to="/browse/list/phim-moi-cap-nhat" />}
+          <MovieRow label="Điểm cao" title="Đáng xem nhất" items={top} to="/browse/list/phim-moi-cap-nhat?sort=rating" ranked />
+          <MovieRow label="Phim bộ" title="Xem dài hơi" items={series.data?.items ?? []} to="/browse/list/phim-bo" />
+          <MovieRow label="Phim lẻ" title="Xem một buổi" items={movies.data?.items ?? []} to="/browse/list/phim-le" />
+          <MovieRow label="Chất lượng" title="Bản 4K" items={ultra.data?.items ?? []} to="/browse/list/4k" />
+        </div>
+      </main>
+      <SiteFooter />
     </div>
     <BackToTop />
-  </Shell>;
+  </div>;
 }

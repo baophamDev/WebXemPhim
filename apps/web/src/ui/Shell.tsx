@@ -8,19 +8,23 @@ import { Clapperboard, Compass, Film, Library, Menu, Search, Users, X } from 'lu
 // Import thẳng từ './pickers', không qua barrel './index': Shell nằm trong barrel đó
 // nên đi đường vòng là tạo phụ thuộc quay đầu giữa hai module.
 import { ThemePicker } from './pickers';
+import { smoothScrollTo } from './smooth';
 
 const scrollPositions = new Map<string, number>();
 
 /**
  * Điều hướng mới thì về đầu trang; bấm Back thì trả lại đúng chỗ đang đọc. Lưu
  * theo `location.key` nên hai lần vào cùng một URL vẫn là hai vị trí riêng.
+ *
+ * Export để trang chủ tự ráp layout (header + hero làm nền ngoài khung viền)
+ * mà vẫn giữ hành vi cuộn này.
  */
-function NavigationEffects() {
+export function NavigationEffects() {
   const location = useLocation();
   const type = useNavigationType();
   useEffect(() => {
     const y = type === 'POP' ? scrollPositions.get(location.key) ?? 0 : 0;
-    requestAnimationFrame(() => scrollTo({ top: y }));
+    requestAnimationFrame(() => smoothScrollTo(y, { immediate: true }));
     return () => { scrollPositions.set(location.key, scrollY); };
   }, [location.key]);
   return null;
@@ -30,7 +34,7 @@ export function Logo() {
   return <Link className="logo" to="/" aria-label="BảoNhànCinema — trang chủ"><span><Clapperboard /></span><b>BảoNhànCinema</b></Link>;
 }
 
-function Header() {
+export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -73,16 +77,20 @@ function Header() {
   </header>;
 }
 
+export function SiteFooter() {
+  return <footer>
+    <Logo />
+    <p>© {new Date().getFullYear()} BảoNhànCinema · Rạp phim riêng của gia đình</p>
+    <div><Link to="/local">Kho đã lưu</Link><Link to="/people">Diễn viên</Link><Link to="/showtimes">Lịch phát hành</Link></div>
+  </footer>;
+}
+
 export function Shell({ children, flush = false, backdrop }: { children: ReactNode; flush?: boolean; backdrop?: ReactNode }) {
   return <div className={flush ? 'app-frame flush' : 'app-frame'}>
     <NavigationEffects />
     <Header />
     {backdrop}
     <main className={flush ? 'flush' : ''}>{children}</main>
-    <footer>
-      <Logo />
-      <p>© {new Date().getFullYear()} BảoNhànCinema · Rạp phim riêng của gia đình</p>
-      <div><Link to="/local">Kho đã lưu</Link><Link to="/people">Diễn viên</Link><Link to="/showtimes">Lịch phát hành</Link></div>
-    </footer>
+    <SiteFooter />
   </div>;
 }
