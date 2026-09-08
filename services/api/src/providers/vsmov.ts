@@ -1,8 +1,9 @@
 /**
- * Nguồn phim duy nhất: VSMOV.
+ * Nguồn phim duy nhất: VSMOV (https://vsmov.com/api-document).
  *
  * Mọi hàm trả về shape đã chuẩn hoá (`ListPage`/`Taxonomy`/`SourceDetail`)
- * thay vì JSON thô của nguồn.
+ * thay vì JSON thô của nguồn. Hành vi thật của từng endpoint (param nào được
+ * đọc, param nào bị bỏ qua) đã đối chiếu bằng request và ghi ở `types.ts`.
  */
 import { getJson, queryString } from './http.js';
 import { emptyMovie, imageUrl, makePagination, names, num, str } from './normalize.js';
@@ -100,22 +101,43 @@ function normalizeEpisodes(payload: any): EpisodeGroup[] {
 const listAt = async (path: string, filters: CatalogFilters = {}): Promise<ListPage> =>
   normalizeList(await request(`${path}${queryString(filters)}`), filters.limit ?? 24);
 
+/**
+ * Chọn lọc tham số gửi lên nguồn theo từng nhóm endpoint, đã đối chiếu bằng
+ * request thật (xem ghi chú trong `types.ts`). Nhóm `/danh-sach/:slug` bỏ qua
+ * `limit` (tự ép 24 hoặc 20) lẫn mọi bộ lọc `year`/`country`/`category` —
+ * giữ chúng trong URL chỉ tạo cache-key thừa mà kết quả không đổi.
+ */
+const danhsachAt = (slug: string, filters: CatalogFilters = {}): Promise<ListPage> =>
+  listAt(`/danh-sach/${encodeURIComponent(slug)}`, pick(filters, 'page', 'type', 'status'));
+
+/** Chỉ gửi khoá có trong danh sách cho phép; phần còn lại bỏ ở máy mình. */
+function pick(filters: CatalogFilters, ...keys: (keyof CatalogFilters)[]): CatalogFilters {
+  const kept: Record<string, string | number> = {};
+  for (const key of keys) {
+    const value = filters[key];
+    if (value !== undefined && value !== null && String(value).trim()) kept[key] = value;
+  }
+  return kept as CatalogFilters;
+}
+
 export const vsmov = {
   name: SOURCE,
-  latest: (page: number, limit = 24) => listAt('/danh-sach/phim-moi-cap-nhat', { page, limit }),
-  home: (filters: CatalogFilters = {}) => listAt('/danh-sach/phim-moi-cap-nhat', filters),
-  list: (slug: string, filters: CatalogFilters = {}) => listAt(`/danh-sach/${encodeURIComponent(slug)}`, filters),
+  latest: (page: number) => listAt('/danh-sach/phim-moi-cap-nhat', { page }),
+  home: (filters: CatalogFilters = {}) => listAt('/danh-sach/phim-moi-cap-nhat', pick(filters, 'page', 'type', 'status')),
+  list: (slug: string, filters: CatalogFilters = {}) => danhsachAt(slug, filters),
   search: async (keyword: string, filters: CatalogFilters = {}) =>
     normalizeList(await request(`/tim-kiem${queryString({ ...filters, keyword })}`, 30_000), filters.limit ?? 24),
   genres: async (): Promise<Taxonomy> => normalizeTaxonomy(await request('/the-loai', 3_600_000)),
   byGenre: (slug: string, filters: CatalogFilters = {}) => listAt(`/the-loai/${encodeURIComponent(slug)}`, filters),
   countries: async (): Promise<Taxonomy> => normalizeTaxonomy(await request('/quoc-gia', 3_600_000)),
-  byCountry: (slug: string, filters: CatalogFilters = {}) => listAt(`/quoc-gia/${encodeURIComponent(slug)}`, filters),
+  byCountry: (slug: string, filters: CatalogFilters = {}) =>
+    listAt(`/quoc-gia/${encodeURIComponent(slug)}`, pick(filters, 'page', 'limit', 'category', 'type', 'status')),
   years: async (): Promise<Taxonomy> => normalizeTaxonomy(await request('/nam', 3_600_000)),
-  byYear: (year: string, filters: CatalogFilters = {}) => listAt(`/nam/${encodeURIComponent(year)}`, filters),
+  byYear: (year: string, filters: CatalogFilters = {}) =>
+    listAt(`/nam/${encodeURIComponent(year)}`, pick(filters, 'page', 'limit', 'type', 'status')),
   actors: async (): Promise<Taxonomy> => normalizeTaxonomy(await request('/dien-vien', 3_600_000)),
   codes: async (): Promise<Taxonomy> => normalizeTaxonomy(await request('/code', 3_600_000)),
-  byCode: (code: string, filters: CatalogFilters = {}) => listAt(`/code/${encodeURIComponent(code)}`, filters),
+  byCode: (code: string, filters: CatalogFilters = {}) => danhsachAt(code, filters),
   detail: async (slug: string): Promise<SourceDetail> => {
     const payload = await request(`/phim/${encodeURIComponent(slug)}`, 60_000);
     const data = unwrap(payload);

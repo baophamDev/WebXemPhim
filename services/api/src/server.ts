@@ -52,8 +52,7 @@ const filtersSchema = z.object({
   page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(48).default(24),
   year: z.string().trim().optional(), country: z.string().trim().optional(), category: z.string().trim().optional(),
   type: z.enum(['single', 'series', 'hoathinh', 'tvshows']).optional(), status: z.enum(['trailer', 'ongoing', 'completed']).optional()
-});
-const slugSchema = z.string().trim().min(1).max(160).regex(/^[a-zA-Z0-9._-]+$/);
+});const slugSchema = z.string().trim().min(1).max(160).regex(/^[a-zA-Z0-9._-]+$/);
 const idSchema = z.coerce.number().int().positive();
 const queryFilters = (query: express.Request['query']) => filtersSchema.parse(query) as CatalogFilters;
 
@@ -149,17 +148,18 @@ async function homeWithFallback(filters: CatalogFilters) {
 }
 
 /**
- * Các danh sách có sẵn của VSMOV ánh xạ về bộ lọc DB tương đương, để rail
- * "Phim bộ / Phim lẻ / 4K" trên trang chủ không trắng khi provider chặn IP server.
+ * Các danh sách có sẵn của VSMOV (đối chiếu bằng request thật): nhóm
+ * `/danh-sach/:slug` hợp lệ gồm `phim-moi-cap-nhat`, `phim-le`, `phim-bo`,
+ * `4k`, `phim-chieu-rap`, `subteam` — `dang-chieu` KHÔNG tồn tại (404).
+ * Ánh xạ về bộ lọc DB tương đương để rail trên trang chủ không trắng khi
+ * provider chặn IP server.
  */
 const LIST_FILTERS: Record<string, { type?: string; sort?: 'recent' | 'year' | 'rating' }> = {
   'phim-moi-cap-nhat': { sort: 'recent' },
   'phim-le': { type: 'single' },
   'phim-bo': { type: 'series' },
-  'dang-chieu': { sort: 'year' },
+  'phim-chieu-rap': { sort: 'year' },
   '4k': { sort: 'rating' },
-  'long-tieng': { sort: 'recent' },
-  'thuyet-minh': { sort: 'recent' },
   subteam: { sort: 'recent' }
 };
 

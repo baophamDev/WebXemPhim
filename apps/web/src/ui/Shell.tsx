@@ -59,7 +59,7 @@ export function Header() {
       <NavLink to="/" end><Film />Trang chủ</NavLink>
       <NavLink to="/browse/list/phim-le"><Film />Phim lẻ</NavLink>
       <NavLink to="/browse/list/phim-bo"><Clapperboard />Phim bộ</NavLink>
-      <NavLink to="/browse/list/dang-chieu"><Compass />Khám phá</NavLink>
+      <NavLink to="/browse/list/phim-chieu-rap"><Compass />Khám phá</NavLink>
       <NavLink to="/people"><Users />Diễn viên</NavLink>
       <NavLink to="/library"><Library />Thư viện</NavLink>
       <button className="nav-close icon-button" onClick={() => setMenuOpen(false)} aria-label="Đóng menu"><X /></button>

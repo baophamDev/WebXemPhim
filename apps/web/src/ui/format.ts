@@ -5,8 +5,8 @@
 import type { Movie } from '../types';
 
 export const listLabels: Record<string, string> = {
-  'phim-moi-cap-nhat': 'Mới cập nhật', 'phim-le': 'Phim lẻ', 'phim-bo': 'Phim bộ', 'dang-chieu': 'Đang chiếu',
-  '4k': 'Phim 4K', 'long-tieng': 'Lồng tiếng', 'thuyet-minh': 'Thuyết minh', subteam: 'Subteam'
+  'phim-moi-cap-nhat': 'Mới cập nhật', 'phim-le': 'Phim lẻ', 'phim-bo': 'Phim bộ',
+  'phim-chieu-rap': 'Phim chiếu rạp', '4k': 'Phim 4K', subteam: 'Subteam'
 };
 
 /** Poster cho thẻ dọc, ảnh ngang cho banner — nguồn thiếu cái nào thì lấy cái còn lại. */

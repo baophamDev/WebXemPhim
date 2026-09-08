@@ -85,18 +85,25 @@ function Hero({ featured, next, warm }: { featured: Movie; next: Movie[]; warm: 
 
 export default function Home() {
   /**
-   * `page`/`limit` của dải đầu này phải khớp với request mà `index.html` bắn
-   * trước lúc còn đang parse HTML — lệch một con số là URL khác đi, câu trả lời
-   * bắn trước không được nhặt và trang chủ lại chờ một round-trip như cũ.
+   * `page` của dải đầu phải khớp request mà `index.html` bắn trước lúc còn đang
+   * parse HTML — lệch một con số là URL khác đi, câu trả lời bắn trước không
+   * được nhặt và trang chủ lại chờ một round-trip như cũ. Không gửi `limit`:
+   * VSMOV ép riêng cho từng nhóm endpoint (`phim-moi-cap-nhat` luôn 24) và bỏ
+   * qua tham số này.
    */
-  const home = useGetCatalogQuery({ kind: 'home', page: 1, limit: 24 });
+  const home = useGetCatalogQuery({ kind: 'home', page: 1 });
   const warm = useWarmDetail();
-  const series = useGetCatalogQuery({ kind: 'list', value: 'phim-bo', page: 1, limit: 12 });
-  const movies = useGetCatalogQuery({ kind: 'list', value: 'phim-le', page: 1, limit: 12 });
-  const ultra = useGetCatalogQuery({ kind: 'list', value: '4k', page: 1, limit: 12 });
+  // Nhóm /danh-sach/:slug của VSMOV bỏ limit nhưng đọc type: phim-bo/phim-le
+  // trả đúng danh sách đó, mỗi request 20 mục — vừa một dải cuốn ngang.
+  const series = useGetCatalogQuery({ kind: 'list', value: 'phim-bo', page: 1 });
+  const movies = useGetCatalogQuery({ kind: 'list', value: 'phim-le', page: 1 });
+  const cinema = useGetCatalogQuery({ kind: 'list', value: 'phim-chieu-rap', page: 1 });
+  const ultra = useGetCatalogQuery({ kind: 'list', value: '4k', page: 1 });
   const items = home.data?.items ?? [];
   const featured = items[0];
   const next = items.slice(1, 3);
+  // VSMOV không hỗ trợ sort theo điểm (thử sort_field trên nguồn: thứ tự không
+  // đổi), nên "Điểm cao" xếp ở client từ rating TMDB của chính các phim mới về.
   const top = useMemo(() => [...items].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 10), [home.data]);
 
   if (home.isError && !featured) {
@@ -113,7 +120,7 @@ export default function Home() {
       <BackToTop />
     </Shell>;
   }
-  return <HomePinned featured={featured} next={next} warm={warm} home={home} series={series} movies={movies} ultra={ultra} items={items} top={top} />;
+  return <HomePinned featured={featured} next={next} warm={warm} home={home} series={series} movies={movies} cinema={cinema} ultra={ultra} items={items} top={top} />;
 }
 
 /**
@@ -125,9 +132,9 @@ export default function Home() {
  * đẩy xuống dưới viewport → cuộn thì frame phủ lên nền. Chỉ bật khi đã có
  * `featured`; skeleton/error đi nhánh Shell thường ở trên.
  */
-function HomePinned({ featured, next, warm, home, series, movies, ultra, items, top }: {
+function HomePinned({ featured, next, warm, home, series, movies, cinema, ultra, items, top }: {
   featured: Movie; next: Movie[]; warm: (movie: Movie) => () => void;
-  home: { isLoading: boolean }; series: { data?: MovieList }; movies: { data?: MovieList }; ultra: { data?: MovieList };
+  home: { isLoading: boolean }; series: { data?: MovieList }; movies: { data?: MovieList }; cinema: { data?: MovieList }; ultra: { data?: MovieList };
   items: Movie[]; top: Movie[];
 }) {
   const pin = useHeroPin<HTMLDivElement>(true, [featured.slug, items.length]);
@@ -146,7 +153,8 @@ function HomePinned({ featured, next, warm, home, series, movies, ultra, items, 
           {home.isLoading
             ? <SkeletonGrid />
             : <MovieRow label="Mới cập nhật" title="Vừa thêm vào kho" items={items} to="/browse/list/phim-moi-cap-nhat" />}
-          <MovieRow label="Điểm cao" title="Đáng xem nhất" items={top} to="/browse/list/phim-moi-cap-nhat?sort=rating" ranked />
+          <MovieRow label="Điểm cao" title="Đáng xem nhất" items={top} to="/browse/list/phim-moi-cap-nhat" ranked />
+          <MovieRow label="Chiếu rạp" title="Đang chiếu tại rạp" items={cinema.data?.items ?? []} to="/browse/list/phim-chieu-rap" />
           <MovieRow label="Phim bộ" title="Xem dài hơi" items={series.data?.items ?? []} to="/browse/list/phim-bo" />
           <MovieRow label="Phim lẻ" title="Xem một buổi" items={movies.data?.items ?? []} to="/browse/list/phim-le" />
           <MovieRow label="Chất lượng" title="Bản 4K" items={ultra.data?.items ?? []} to="/browse/list/4k" />

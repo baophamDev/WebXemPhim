@@ -113,20 +113,21 @@ test('%VITE_API_URL% chỉ được xuất hiện một lần trong khối scrip
 test('trang chủ: bắn đúng một request và RTK Query nhặt lại được', () => {
   const { queue, sent } = runBoot('/');
   assert.equal(queue.length, 1);
-  assert.equal(sent[0], `${API}/catalog/home?page=1&limit=24`);
-  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1, limit: 24 } }), 'phải khớp');
+  assert.equal(sent[0], `${API}/catalog/home?page=1`);
+  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1 } }), 'phải khớp');
 });
 
-test('trang chủ: page/limit trong index.html khớp Home.tsx', () => {
-  // Đây là chỗ coupling im lặng nhất trong cả cơ chế: đổi limit ở một bên thì URL
-  // khác đi, không nhặt được, trang chủ chờ lại như cũ mà không báo gì.
-  const call = /useGetCatalogQuery\(\{\s*kind:\s*'home',\s*page:\s*(\d+),\s*limit:\s*(\d+)\s*\}\)/
+test('trang chủ: page trong index.html khớp Home.tsx', () => {
+  // Đây là chỗ coupling im lặng nhất trong cả cơ chế: đổi page ở một bên thì URL
+  // khác đi, không nhặt được, trang chủ chờ lại như cũ mà không báo gì. Home.tsx
+  // không gửi limit — VSMOV ép riêng cho từng nhóm endpoint và bỏ qua tham số đó.
+  const call = /useGetCatalogQuery\(\{\s*kind:\s*'home',\s*page:\s*(\d+)\s*\}\)/
     .exec(read('src/pages/Home.tsx'));
   assert.ok(call, 'không tìm thấy lời gọi dải đầu trong Home.tsx — sửa test này cho khớp code');
   const { queue } = runBoot('/');
   assert.ok(
-    claim(queue, { url: '/catalog/home', params: { page: Number(call[1]), limit: Number(call[2]) } }),
-    `index.html bắn page/limit khác Home.tsx (${call[1]}/${call[2]})`
+    claim(queue, { url: '/catalog/home', params: { page: Number(call[1]) } }),
+    `index.html bắn page khác Home.tsx (${call[1]})`
   );
 });
 
@@ -151,20 +152,20 @@ test('trang xem: bắn tập TRƯỚC phim, và nhặt lại được cả hai',
 
 test('thứ tự tham số khác nhau vẫn là cùng một request', () => {
   const { queue } = runBoot('/');
-  assert.ok(claim(queue, { url: '/catalog/home', params: { limit: 24, page: 1 } }));
+  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1 } }));
 });
 
 test('VITE_API_URL chưa đặt: cả hai bên lùi về /api', () => {
   const { queue, sent } = runBoot('/', { base: '%VITE_API_URL%' });
-  assert.equal(sent[0], '/api/catalog/home?page=1&limit=24');
-  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1, limit: 24 } }, '/api'));
+  assert.equal(sent[0], '/api/catalog/home?page=1');
+  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1 } }, '/api'));
 });
 
 test('VITE_API_URL có dấu / lặp ở cuối vẫn khớp', () => {
   // Script cắt hết dấu `/` cuối, api.ts cắt đúng một dấu — nên một bên ra
   // `/api//catalog`. Cùng endpoint với Express, khác chuỗi; `shape()` phải gộp lại.
   const { queue } = runBoot('/', { base: `${API}//` });
-  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1, limit: 24 } }, `${API}/`));
+  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1 } }, `${API}/`));
 });
 
 test('route không có trong danh sách thì không bắn gì', () => {
@@ -175,7 +176,7 @@ test('route không có trong danh sách thì không bắn gì', () => {
 
 test('nhặt một lần: lần thứ hai phải tự đi hỏi lại', () => {
   const { queue } = runBoot('/');
-  const args = { url: '/catalog/home', params: { page: 1, limit: 24 } };
+  const args = { url: '/catalog/home', params: { page: 1 } };
   assert.ok(claim(queue, args));
   // Giữ lại thì một cú refetch() nhận đúng dữ liệu cũ, và người dùng bấm "thử lại"
   // mãi vẫn thấy y nguyên.
@@ -185,12 +186,12 @@ test('nhặt một lần: lần thứ hai phải tự đi hỏi lại', () => {
 test('quá 30 giây thì thà hỏi lại', () => {
   const { queue } = runBoot('/');
   queue[0].at -= 31_000;
-  assert.equal(claim(queue, { url: '/catalog/home', params: { page: 1, limit: 24 } }), null);
+  assert.equal(claim(queue, { url: '/catalog/home', params: { page: 1 } }), null);
 });
 
 test('URL không khớp thì bỏ qua, và request đó vẫn còn nguyên trong hàng', () => {
   const { queue } = runBoot('/');
-  assert.equal(claim(queue, { url: '/catalog/home', params: { page: 2, limit: 24 } }), null);
+  assert.equal(claim(queue, { url: '/catalog/home', params: { page: 2 } }), null);
   assert.equal(queue.length, 1, 'không được lấy mất request của endpoint khác');
 });
 

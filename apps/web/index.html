@@ -72,11 +72,12 @@
         var movie = /^\/movie\/([^/]+)$/.exec(path);
         var watch = /^\/watch\/([^/]+)\/(\d+)$/.exec(path);
         if (path === '/' || path === '/index.html') {
-          // Chỉ dải đầu (hero + "Vừa thêm vào kho"). Bốn dải còn lại nằm dưới
-          // màn hình đầu — bắn cả năm ở đây thì chúng giành băng thông với chính
-          // cái bundle đang cần về sớm. page/limit phải khớp useGetCatalogQuery
-          // trong src/pages/Home.tsx.
-          grab(base + '/catalog/home?page=1&limit=24');
+          // Chỉ dải đầu (hero + "Vừa thêm vào kho"). Các dải còn lại nằm dưới
+          // màn hình đầu — bắn cả ở đây thì chúng giành băng thông với chính
+          // cái bundle đang cần về sớm. page phải khớp useGetCatalogQuery trong
+          // src/pages/Home.tsx; không có limit vì VSMOV ép riêng cho từng nhóm
+          // endpoint (phim-moi-cap-nhat luôn 24) và bỏ qua tham số này.
+          grab(base + '/catalog/home?page=1');
         } else if (movie) {
           grab(base + '/catalog/movies/' + seg(movie[1]));
         } else if (watch) {

@@ -93,7 +93,7 @@ export default function Browse() {
 
   return <Shell>
     <div className="page-container page-top">
-      <Breadcrumb items={[['Trang chủ', '/'], ['Khám phá', '/browse/list/dang-chieu'], [title, '']]} />
+      <Breadcrumb items={[['Trang chủ', '/'], ['Khám phá', '/browse/list/phim-chieu-rap'], [title, '']]} />
       <div className="page-title">
         <div>
           <RailLabel prefix={label}>{title}</RailLabel>

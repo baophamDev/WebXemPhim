@@ -5,6 +5,17 @@
  * `SourceDetail`) chứ không phải payload thô của nguồn.
  */
 
+/**
+ * Bộ lọc đúng nghĩa của VSMOV, đối chiếu từng endpoint bằng request thật:
+ *
+ * - `page` + `limit`: hoạt động ở `/tim-kiem` và `/the-loai|/quoc-gia|/nam/:slug`,
+ *   còn nhóm `/danh-sach/:slug` tự ép limit riêng (24 hoặc 20) và **bỏ qua limit**.
+ * - `year` + `country` + `category`: chỉ `/tim-kiem` và `/the-loai/:slug` đọc;
+ *   `/quoc-gia/:slug` bỏ `year`/`country` nhưng đọc `category`, còn `/nam/:slug`
+ *   bỏ `country`/`category` nhưng đọc `type`.
+ * - `type` + `status`: mọi endpoint danh sách đều đọc.
+ * - `sort*`: không endpoint nào honour — không gửi, tránh URL chứa tham số chết.
+ */
 export interface CatalogFilters {
   page?: number;
   limit?: number;

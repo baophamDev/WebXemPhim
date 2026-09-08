@@ -13,8 +13,8 @@ const SOURCE = 'vsmov';
 
 export const catalog = {
   names: [SOURCE],
-  latest: async (page: number, limit = 24) => ({
-    ...(checkList(SOURCE, await vsmov.latest(page, limit))),
+  latest: async (page: number) => ({
+    ...(checkList(SOURCE, await vsmov.latest(page))),
     source: SOURCE
   }),
   home: async (filters: CatalogFilters = {}) => ({
