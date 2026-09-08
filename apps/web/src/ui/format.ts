@@ -9,8 +9,12 @@ export const listLabels: Record<string, string> = {
   'phim-chieu-rap': 'Phim chiếu rạp', '4k': 'Phim 4K', subteam: 'Subteam'
 };
 
-/** Poster cho thẻ dọc, ảnh ngang cho banner — nguồn thiếu cái nào thì lấy cái còn lại. */
-export const image = (movie: Movie, wide = false) => (wide ? movie.thumbUrl || movie.posterUrl : movie.posterUrl || movie.thumbUrl);
+/**
+ * Chọn ảnh theo hướng hiển thị, khớp quy ước ngược tên của VSMOV: `poster_url`
+ * là ảnh ngang (backdrop 1920×1080...) còn `thumb_url` là poster dọc 2:3.
+ * Nguồn thiếu cái nào thì lấy cái còn lại (CSS object-fit tự cắt cho vừa khung).
+ */
+export const image = (movie: Movie, wide = false) => (wide ? movie.posterUrl || movie.thumbUrl : movie.thumbUrl || movie.posterUrl);
 
 /** Mô tả của nguồn có thẻ HTML lẫn trong; bỏ hết để không chèn markup lạ vào trang. */
 export const clean = (html: string | null) => (html ? html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '');

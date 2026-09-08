@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Film, Play, Star } from 'lucide-react';
+import { Film, Pause, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
-import { clean, BackToTop, ErrorState, Header, image, NavigationEffects, RailLabel, Shell, SiteFooter, SkeletonGrid, Spec, SyncStatus, useWarmDetail } from '../ui';
+import { clean, BackToTop, ErrorState, Header, image, NavigationEffects, RailLabel, Shell, SiteFooter, SkeletonGrid, Spec, SyncStatus, useHeroRotation, useWarmDetail } from '../ui';
 import { HeroPanelBeam } from '../ui/beam';
 import { MovieRow } from '../ui/Rail';
 import { useHeroEntrance, useHeroPin, useSmoothScroll } from '../ui/motion';
@@ -49,15 +49,78 @@ function NextUp({ items }: { items: Movie[] }) {
   </div>;
 }
 
+/** Hai phim kế tiếp trong vòng xoay, bỏ qua phim đang chiếu. */
+function nextUp(rotation: Movie[], index: number): Movie[] {
+  if (rotation.length < 3) return rotation.filter((_, i) => i !== index);
+  return [rotation[(index + 1) % rotation.length], rotation[(index + 2) % rotation.length]];
+}
+
+/** Chỉ ảnh của phim đầu tiên là LCP; các ảnh sau do hero xoay mang tính trang trí. */
+const highPriority = (index: number) => (index === 0 ? 'high' : 'auto') as 'high' | 'auto';
+
+/**
+ * Chỉ báo bấm-chọn của hero: mỗi phim đang xoay một vạch, vạch đang phát có
+ * thanh tiến trình chạy đúng 10s của một chu kỳ. Vạch là <button> để bấm chọn
+ * phim luôn, không phải chờ hết chu kỳ.
+ */
+function HeroDots({ items, index, onSelect }: { items: Movie[]; index: number; onSelect: (i: number) => void }) {
+  if (items.length < 2) return null;
+  return <div className="hero-dots" role="group" aria-label="Chọn phim nổi bật">
+    {items.map((movie, i) => <button
+      key={movie.slug}
+      type="button"
+      className={i === index ? 'on' : ''}
+      aria-label={i === index ? `Đang chiếu: ${movie.name}` : `Chuyển sang ${movie.name}`}
+      onClick={() => onSelect(i)}
+    ><i /></button>)}
+  </div>;
+}
+
 /**
  * Mở màn trang chủ. Tách khỏi `Home` để timeline GSAP bám theo `featured`:
  * dữ liệu về sau mount, `useHeroEntrance` diễn lại mỗi khi đổi phim nổi bật.
+ *
+ * Hero tự nhảy phim tiếp theo trong `rotation` mỗi 10 giây (xem ui/heroRotate);
+ * con trỏ vào hero thì tạm dừng, rời đi thì nhịp chạy lại từ đầu chu kỳ.
  */
-function Hero({ featured, next, warm }: { featured: Movie; next: Movie[]; warm: (movie: Movie) => () => void }) {
+function Hero({ rotation, warm }: { rotation: Movie[]; warm: (movie: Movie) => () => void }) {
+  const [hold, setHold] = useState(false);
+  const [manual, setManual] = useState<number | null>(null);
+  const auto = useHeroRotation(rotation, hold);
+  const index = manual ?? auto;
+  const featured = rotation[index] ?? rotation[0];
+
+  // Người dùng bấm chọn phim: lấy quyền điều khiển khỏi bộ đếm. Bấm lại đúng
+  // vạch hiện tại thì trả về cho bộ đếm — hành vi bật/tắt quen thuộc của nút phát.
+  const select = (i: number) => {
+    if (i === index && manual !== null) setManual(null);
+    else { setManual(i); setHold(false); }
+  };
+
+  // Ảnh của phim kế tiếp về sẵn trước khi tới lượt: cú chuyển không còn trống
+  // trắng chờ tải. Hai link trong panel trỏ phim hiện tại nên khóa theo slug.
+  const upcoming = rotation[(index + 1) % rotation.length];
+  useEffect(() => {
+    const url = upcoming && image(upcoming, true);
+    if (!url) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    return () => { img.src = ''; };
+  }, [upcoming]);
+
   const scope = useHeroEntrance<HTMLElement>([featured.slug]);
-  return <section className="hero" ref={scope}>
-    {/* fetchPriority + không lazy: đây là ảnh LCP của trang chủ. */}
-    <img data-motion="media" className="hero-media" src={image(featured, true) || '/poster-placeholder.svg'} alt="" fetchPriority="high" decoding="async" />
+  return <section className="hero" ref={scope}
+    onPointerEnter={() => setHold(true)}
+    onPointerLeave={() => setHold(false)}
+  >
+    {/* fetchPriority + không lazy: đây là ảnh LCP của trang chủ. `key` đổi theo
+        slug để đổi phim là một <img> mới — không bắn request ảnh cũ đang dở. */}
+    <img
+      key={featured.slug} data-motion="media" className="hero-media"
+      src={image(featured, true) || '/poster-placeholder.svg'}
+      alt="" fetchPriority={highPriority(index)} decoding="async"
+    />
     <div className="hero-veil" />
     {/* Lớp phủ tối + mờ dần khi sheet nội dung trượt lên che hero (GSAP scrub). */}
     <div className="hero-overlay" aria-hidden="true" />
@@ -68,15 +131,20 @@ function Hero({ featured, next, warm }: { featured: Movie; next: Movie[]; warm: 
         <FavoriteButton movie={featured} />
       </div>
       <HeroPanelBeam>
-      <aside className="hero-panel hero-panel--beam">
+      <aside className="hero-panel hero-panel--beam" key={featured.slug}>
         <span className="hero-eyebrow">{featured.originName || 'Mới về kho'}</span>
         <Spec movie={featured} />
         <p className="description">{clean(featured.description) || `Xem ${featured.name} ngay trên kho phim của gia đình.`}</p>
         <div className="actions">
           <Link className="button primary" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Play fill="currentColor" />Phát</Link>
           <Link className="button ghost" to={`/movie/${featured.slug}`} state={{ preview: featured }} onPointerDown={warm(featured)}><Film />Chi tiết</Link>
+          {rotation.length > 1 && <button
+            type="button" className="button ghost hero-toggle" aria-hidden="true" tabIndex={-1}
+            onClick={() => setHold((h) => !h)}
+          >{hold ? <Play fill="currentColor" /> : <Pause fill="currentColor" />}</button>}
         </div>
-        <NextUp items={next} />
+        <HeroDots items={rotation} index={index} onSelect={select} />
+        <NextUp items={nextUp(rotation, index)} />
       </aside>
       </HeroPanelBeam>
     </div>
@@ -100,8 +168,10 @@ export default function Home() {
   const cinema = useGetCatalogQuery({ kind: 'list', value: 'phim-chieu-rap', page: 1 });
   const ultra = useGetCatalogQuery({ kind: 'list', value: '4k', page: 1 });
   const items = home.data?.items ?? [];
+  // Danh sách xoay hero: 5 phim đầu của trang, chỉ giữ phim có ảnh ngang làm
+  // nền (thiếu thì vạch đó sẽ hiện poster dọc bị kéo căng — đúng lỗi vừa sửa).
+  const rotation = useMemo(() => items.filter((movie) => image(movie, true)).slice(0, 5), [home.data]);
   const featured = items[0];
-  const next = items.slice(1, 3);
   // VSMOV không hỗ trợ sort theo điểm (thử sort_field trên nguồn: thứ tự không
   // đổi), nên "Điểm cao" xếp ở client từ rating TMDB của chính các phim mới về.
   const top = useMemo(() => [...items].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 10), [home.data]);
@@ -120,7 +190,7 @@ export default function Home() {
       <BackToTop />
     </Shell>;
   }
-  return <HomePinned featured={featured} next={next} warm={warm} home={home} series={series} movies={movies} cinema={cinema} ultra={ultra} items={items} top={top} />;
+  return <HomePinned rotation={rotation} warm={warm} home={home} series={series} movies={movies} cinema={cinema} ultra={ultra} items={items} top={top} />;
 }
 
 /**
@@ -132,11 +202,12 @@ export default function Home() {
  * đẩy xuống dưới viewport → cuộn thì frame phủ lên nền. Chỉ bật khi đã có
  * `featured`; skeleton/error đi nhánh Shell thường ở trên.
  */
-function HomePinned({ featured, next, warm, home, series, movies, cinema, ultra, items, top }: {
-  featured: Movie; next: Movie[]; warm: (movie: Movie) => () => void;
+function HomePinned({ rotation, warm, home, series, movies, cinema, ultra, items, top }: {
+  rotation: Movie[]; warm: (movie: Movie) => () => void;
   home: { isLoading: boolean }; series: { data?: MovieList }; movies: { data?: MovieList }; cinema: { data?: MovieList }; ultra: { data?: MovieList };
   items: Movie[]; top: Movie[];
 }) {
+  const featured = rotation[0];
   const pin = useHeroPin<HTMLDivElement>(true, [featured.slug, items.length]);
   const smooth = useSmoothScroll<HTMLDivElement>(true, [featured.slug, items.length]);
   const homeRef = (node: HTMLDivElement | null) => { pin.current = node; smooth.current = node; };
@@ -144,7 +215,7 @@ function HomePinned({ featured, next, warm, home, series, movies, cinema, ultra,
     <NavigationEffects />
     <div className="home-bg">
       <Header />
-      <Hero featured={featured} next={next} warm={warm} />
+      <Hero rotation={rotation} warm={warm} />
     </div>
     <div className="app-frame home-frame">
       <main>

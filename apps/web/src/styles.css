@@ -472,6 +472,8 @@ main.flush { padding-top: 0; }
 .gsap-on .hero-media,
 .gsap-on .hero-copy > *,
 .gsap-on .hero-beam { animation: none; }
+/* GSAP đã nhận mở màn hero — nhưng thanh tiến trình 10s của vạch hero-dots là
+   nhịp chức năng, không phải hiệu ứng trang trí, nên GSAP không tắt nó. */
 /* Lớp phủ tối + mờ trên hero, GSAP scrub opacity 0→1 khi sheet trượt lên.
    Không bắt pointer để nút Phát/Chi tiết dưới nó vẫn bấm được lúc chưa tối. */
 .hero-overlay {
@@ -524,6 +526,25 @@ html.lenis, html.lenis body { height: auto; }
 .hero-panel .description { max-width: none; margin-bottom: 18px; }
 .hero-panel .actions { margin-bottom: 4px; }
 .next-up { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--edge); }
+/* Vạch chọn phim của hero xoay: mỗi phim một vạch nằm ngang, vạch đang chiếu
+   có thanh tiến trình chạy đúng 10s của một chu kỳ. `key` trên panel đổi theo
+   slug nên animation khởi động lại từ 0 đúng lúc phim mới lên — không cần JS
+   canh giây. reduced-motion: thanh đứng yên, vạch vẫn bấm được. */
+.hero-dots { display: flex; gap: 6px; margin: 18px 0 4px; }
+.hero-dots button {
+  flex: 1; min-width: 0; height: 4px; padding: 0; border: 0; cursor: pointer;
+  border-radius: var(--r-pill); background: var(--edge-hi); overflow: hidden;
+  transition: background .2s ease-out;
+}
+.hero-dots button:hover { background: var(--track); }
+.hero-dots button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.hero-dots i { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left; background: var(--chrome); }
+.hero-dots button.on { background: var(--track); }
+.hero-dots button.on i { animation: hero-cycle 10s linear both; }
+@media (prefers-reduced-motion: reduce) { .hero-dots button.on i { transform: scaleX(1); animation: none; } }
+@keyframes hero-cycle { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* Nút tạm dừng xoay: cùng dáng nút ghost nhưng chỉ là biểu tượng, không chữ. */
+.hero-toggle { min-width: 46px; padding: 0; }
 .next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .next-grid a { display: block; min-width: 0; }
 .next-grid > a > div {

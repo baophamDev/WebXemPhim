@@ -8,6 +8,7 @@
  */
 export { clean, humanize, image, listLabels, stillMotion } from './format';
 export { useDebounced, useDropdown } from './hooks';
+export { useHeroRotation } from './heroRotate';
 export { Logo, Shell, Header, SiteFooter, NavigationEffects } from './Shell';
 export { MovieCard, RailLabel, Spec, useWarmDetail } from './cards';
 export { EmptyState, ErrorState, RouteFallback, SkeletonGrid, SyncStatus } from './states';
