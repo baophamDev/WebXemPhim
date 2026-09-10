@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Pause, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
 import { clean, BackToTop, ErrorState, Header, image, NavigationEffects, RailLabel, Shell, SiteFooter, SkeletonGrid, Spec, SyncStatus, useHeroRotation, useWarmDetail } from '../ui';
 import { HeroPanelBeam } from '../ui/beam';
 import { MovieRow } from '../ui/Rail';
-import { useHeroEntrance, useHeroPin, useSmoothScroll } from '../ui/motion';
+import { useHeroEntrance, useHeroPin, useFloatingHeader, useSmoothScroll } from '../ui/motion';
 import type { Movie, MovieList } from '../types';
 
 /**
@@ -126,8 +126,8 @@ function Hero({ rotation, warm }: { rotation: Movie[]; warm: (movie: Movie) => (
     <div className="hero-overlay" aria-hidden="true" />
     <div className="hero-layout">
       <div className="hero-copy" data-motion="copy">
-        <span className="hero-eyebrow">{featured.genres?.[0] ?? 'Đang nổi'} · {featured.type === 'series' || featured.type === 'tv' ? 'Phim bộ' : 'Phim lẻ'}</span>
         <HeroTitle name={featured.name} />
+        <span className="hero-eyebrow">{featured.genres?.[0] ?? 'Đang nổi'} · {featured.type === 'series' || featured.type === 'tv' ? 'Phim bộ' : 'Phim lẻ'}</span>
         <FavoriteButton movie={featured} />
       </div>
       <HeroPanelBeam>
@@ -210,12 +210,17 @@ function HomePinned({ rotation, warm, home, series, movies, cinema, ultra, items
   const featured = rotation[0];
   const pin = useHeroPin<HTMLDivElement>(true, [featured.slug, items.length]);
   const smooth = useSmoothScroll<HTMLDivElement>(true, [featured.slug, items.length]);
+  const float = useFloatingHeader<HTMLDivElement>([featured.slug, items.length]);
   const homeRef = (node: HTMLDivElement | null) => { pin.current = node; smooth.current = node; };
   return <div className="home" ref={homeRef}>
     <NavigationEffects />
     <div className="home-bg">
-      <Header />
       <Hero rotation={rotation} warm={warm} />
+    </div>
+    {/* Header tách khỏi nền fixed: là thanh fixed riêng nên khi khung viền trượt
+        lên che hero, header vẫn nổi trên nội dung thay vì bị chìm theo nền. */}
+    <div className="home-header-actions" ref={float}>
+      <Header />
     </div>
     <div className="app-frame home-frame">
       <main>

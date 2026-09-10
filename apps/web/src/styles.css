@@ -263,7 +263,7 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: up
 /* Header nổi trên hero/detail cũng thuộc "sân khấu tối" ở light mode: chữ tối
    trên ảnh tối là không đọc được, nên ép cả thanh về token tối. */
 :root[data-theme='light'] .app-frame.flush .app-header,
-:root[data-theme='light'] .home-bg .app-header {
+:root[data-theme='light'] .home-header-actions .app-header {
   color: #f7f0e7;
   --ink: #f7f0e7;
   --ink-dim: #e3d3bd;
@@ -493,12 +493,43 @@ main.flush { padding-top: 0; }
 }
 /* Header nổi trên hero như bản flush cũ: gradient tắt dần, không viền đáy,
    luôn nằm trên overlay (z 10) nên vẫn bấm được khi hero tối đi. */
-.home-bg .app-header {
-  position: absolute; inset: 0 0 auto 0; z-index: 10; min-height: var(--header-h);
-  background: linear-gradient(rgb(var(--veil) / .72), rgb(var(--veil) / 0)); border-bottom: 0;
-}
 .home-bg .hero { height: 100vh; height: 100svh; min-height: 0; }
 .home-frame { position: relative; z-index: 1; margin-top: 100vh; margin-top: 100svh; }
+
+/* Thanh trên trang chủ: fixed riêng (không còn nằm trong .home-bg) để vẫn nổi
+   trên nội dung khi khung viền trượt lên che hero. `.home-header-actions` là
+   "thanh chứa" — chính nó được GSAP đổi trạng thái top ↔ float (class
+   `.is-float`, xem ui/motion.ts useFloatingHeader); `.app-header` bên trong giữ
+   dáng full-bleed khi đầu trang và là "nội dung thuốc" khi nổi. Thanh luôn
+   tràn hai mép: độ rộng viên thuốc thu bằng scale (transform GSAP), độ cao
+   rơi xuống 12px cũng do GSAP giữ (y) nên không có cú nhảy inset nào lộ. */
+.home-header-actions { position: fixed; inset: 0 0 auto; z-index: 40; will-change: transform; }
+.home-header-actions .app-header {
+  position: absolute; inset: 0 0 auto; min-height: var(--header-h);
+  background: linear-gradient(rgb(var(--veil) / .72), rgb(var(--veil) / 0)); border-bottom: 0;
+}
+/* Trạng thái nổi: thu hai mép vào, thành viên thuốc bo góc viền aurora — cùng
+   một bộ gradient trúng với khung viền nên đọc là mảnh của hệ thống. */
+.home-header-actions.is-float .app-header {
+  min-height: 0; padding: 0 14px;
+  border-radius: 14px; border-bottom: 0;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(rgb(var(--veil) / .9), rgb(var(--veil) / .9)) padding-box,
+    conic-gradient(from 24deg, #ff5f1f, #ffb52e, #fff6dd, #ffb52e, #ff5f1f) border-box;
+  box-shadow: 0 0 30px rgba(255, 106, 31, .22), 0 18px 40px rgba(0, 0, 0, .5);
+}
+/* Đang giữa hai trạng thái: transition cho cú "vọt lên" của GSAP đọc là
+   một khối chuyển dạng, không phải hai thanh nhảy thay nhau. */
+@media not (prefers-reduced-motion: reduce) {
+  .home-header-actions .app-header {
+    transition:
+      border-radius .5s cubic-bezier(.2, .7, .3, 1),
+      padding .5s cubic-bezier(.2, .7, .3, 1),
+      box-shadow .5s ease-out,
+      background .35s ease-out;
+  }
+}
 
 /* Lenis: khi bị stop (menu đang mở) thì khoá cuộn nền lại, nếu không thanh
    cuộn gốc vẫn trôi khi người dùng lăn chuột lên phần đã fixed. */
@@ -1212,6 +1243,9 @@ footer > div a:hover { color: var(--amber); }
   .pin-on .home-bg .hero { height: auto; min-height: 76vh; }
   .pin-on .home-frame { margin-top: 0; }
   .pin-on .home-sheet { border-radius: 16px 16px 0 0; }
+  /* Màn hẹp: hook float không chạy nên thanh quay về flow thường, nằm trên
+     hero như một dải gradient đầu trang (absolute, cuộn cùng trang). */
+  .pin-on .home-header-actions { position: absolute; inset: 0 0 auto; will-change: auto; }
   .next-grid { grid-template-columns: 1fr 1fr; }
   .page-top { padding-top: 28px; }
   .page-title { align-items: flex-start; flex-direction: column; gap: 16px; }

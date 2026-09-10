@@ -143,6 +143,110 @@ export function useHeroPin<T extends HTMLElement = HTMLElement>(enabled = true, 
 }
 
 /**
+ * Thanh trên trôi nổi (trang chủ): một thanh fixed riêng, hai trạng thái.
+ *
+ * - Đứng đầu (scroll 0): tràn đầy hai mép, nền là gradient tắt dần hợp nhất
+ *   với ảnh hero — đúng dáng ban đầu của trang.
+ * - Trôi nổi (đã cuộn): thu nhỏ còn viên thuốc bo góc viền aurora, nằm giữa
+ *   màn hình trên nội dung, bóng đổ xuống như một thiết bị thật.
+ *
+ * Hành vi theo yêu cầu "trượt đi mượt mà": mỗi lần đổi trạng thái, thanh bay
+ * LÊN hết khỏi màn hình rồi rơi ngược xuống đúng vị trí nghỉ của trạng thái
+ * mới — cuộn xuống là vọt lên rồi thả vào viên thuốc, cuộn ngược lên tận đầu
+ * thì vọt lên rồi sà xuống trả về dáng cũ. Chuyển động là một timeline GSAP
+ * hai nhịp (bay lên .2s + rơi xuống .34s) trên transform; nền/viền/bo góc đổi
+ * qua class `.is-float` có transition CSS chạy cùng nhịp nên đọc là một khối
+ * đang chuyển dạng. play()/reverse() đảo chiều từ đúng thời điểm hiện tại nên
+ * đổi ý giữa chừng không giật.
+ *
+ * Cửa an toàn giống các hook còn lại: không JS / giảm motion / màn hẹp / thanh
+ * chưa vào layout pin thì không gắn gì — header nằm `absolute` trên hero theo
+ * CSS mặc định, không kẹt.
+ */
+const FLOAT_MIN_WIDTH = '(min-width: 821px)';
+
+export function useFloatingHeader<T extends HTMLElement = HTMLElement>(deps: unknown[] = []) {
+  registerMotion();
+  const scope = useRef<T>(null);
+  useGSAP(() => {
+    const bar = scope.current;
+    if (!bar || !motionAllowed()) return;
+    if (typeof window.matchMedia === 'function' && !window.matchMedia(FLOAT_MIN_WIDTH).matches) return;
+    // Chỉ chạy khi layout pin đã dựng: CSS mobile tắt pin thì thanh nằm absolute
+    // trên hero theo flow thường — float sẽ đè nội dung. useHeroPin đăng ký
+    // trước hook này trên cùng phần tử nên class đã có tại đây.
+    const root = bar.closest('.home');
+    if (!root?.classList.contains('pin-on')) return;
+    const skin = bar.querySelector<HTMLElement>('.app-header');
+    if (!skin) return;
+    bar.classList.add('float-on');
+    markGsapOn();
+    // Bar cao 0 (con tuyệt đối không kéo giãn cha) nên đo phần tử da bên trong;
+    // trừ thêm chút nữa cho chắc chắn khuất hẳn khỏi mép trên.
+    const hideY = -skin.offsetHeight - 16;
+    // Thu nhỏ quanh mép TRÊN và rơi xuống chừa 12px trần — thanh full-bleed
+    // thu dần thành viên thuốc treo giữa màn hình, không nhảy inset.
+    gsap.set(bar, { transformOrigin: '50% 0%' });
+    const tl = gsap.timeline({ paused: true })
+      .to(bar, { y: hideY, duration: 0.2, ease: 'power2.in' })
+      .to(bar, { y: 12, scale: 0.875, duration: 0.34, ease: 'power3.out' }); // Dáng nổi thu còn 0.875 ≈ --header-h: nhỏ hơn thì các nút 46px chật thuốc.
+    let floating = false;
+    const setState = (next: boolean) => {
+      if (next === floating) return;
+      floating = next;
+      bar.classList.toggle('is-float', floating);
+      if (floating) tl.play(); else tl.reverse();
+    };
+    // Reload/quay lại đang giữa trang: vào thẳng dáng nổi, khỏi diễn mở màn.
+    if (window.scrollY > 4) {
+      floating = true;
+      bar.classList.add('is-float');
+      tl.progress(1);
+    }
+    // Thanh fixed luôn trong viewport nên mốc chỉ cần "đã rời đầu trang" —
+    // nghe scroll trực tiếp thay vì ScrollTrigger: .home-frame có margin-top
+    // 100vh và margin-collapse đẩy chính .home xuống 900px trong document,
+    // nên mọi trigger theo toạ độ .home đều lệch đúng một màn hình.
+    let last = window.scrollY;
+    let active = true; // breakpoint mobile tạm ngưng, quay lại desktop thì bật lại
+    const onScroll = () => {
+      if (!active) return;
+      const y = window.scrollY;
+      const down = y > last;
+      last = y;
+      if (down && y > 4) setState(true); // xuống là vọt lên ngay
+      else if (!down && y <= 4) setState(false); // lên hết mới sà xuống
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // Cửa sổ resize qua ngưỡng desktop ↔ mobile: CSS mobile trả thanh về
+    // absolute trên hero theo flow thường — ngừng can thiệp và dọn sạch state,
+    // không thì is-float sống sót và viên thuốc đè lên hero mobile
+    // (đúng lỗi test resize bắt được).
+    const mq = typeof window.matchMedia === 'function' ? window.matchMedia(FLOAT_MIN_WIDTH) : null;
+    const onBreakpoint = (event: MediaQueryListEvent) => {
+      active = event.matches;
+      if (event.matches) {
+        bar.classList.add('float-on');
+        // Vào lại desktop đang giữa trang: thả thẳng về dáng nổi.
+        if (window.scrollY > 4) setState(true);
+      } else {
+        setState(false);
+        bar.classList.remove('float-on');
+        gsap.set(bar, { clearProps: 'transform' });
+      }
+    };
+    mq?.addEventListener('change', onBreakpoint);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      mq?.removeEventListener('change', onBreakpoint);
+      tl.kill();
+      bar.classList.remove('is-float');
+    };
+  }, { scope, dependencies: deps, revertOnUpdate: true });
+  return scope;
+}
+
+/**
  * Cuộn mượt toàn trang bằng Lenis: bánh xe chạy có quán tính thay vì nhảy
  * từng nấc, nhưng vẫn điều khiển đúng thanh cuộn gốc nên `position: fixed`
  * (nền hero trang chủ) và `content-visibility` giữ nguyên tác dụng.
