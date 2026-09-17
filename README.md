@@ -607,6 +607,15 @@ Kiểm tra:
 2. API health Railway có mở được trực tiếp không.
 3. `WEB_ORIGIN` có đúng domain Vercel và không chứa `/api` không.
 4. Sau khi sửa biến Vercel, đã redeploy frontend chưa. Biến `VITE_*` được đóng vào lúc build nên sửa biến mà không redeploy sẽ chưa có tác dụng.
+### API Railway trả `404 Application not found`
+
+Edge của Railway trả đúng câu này khi **không còn service nào đứng sau domain**: project bị xoá, service bị xoá, hoặc credit của trial đã hết. Đây không phải lỗi của web — kiểm tra bằng `curl.exe -s https://<app>.up.railway.app/api/health`, ra `{"status":"error","code":404,"message":"Application not found"}` nghĩa là phải tạo lại service (hoặc nạp credit) rồi trỏ `VITE_API_URL` sang domain mới. Domain đổi thì phải redeploy frontend, vì biến `VITE_*` được đóng vào bundle lúc build.
+
+### Web vẫn xem được phim khi API chết
+
+Catalog không phụ thuộc hoàn toàn vào API: nguồn vsmov trả `Access-Control-Allow-Origin: *` nên **trình duyệt** gọi thẳng được, và [apps/web/src/catalogFallback.ts](apps/web/src/catalogFallback.ts) dịch route catalog của API sang request tương ứng của nguồn khi API không trả lời (lỗi mạng, 404, 5xx, hoặc rewrite trả HTML). Nhờ vậy trang chủ, khám phá, menu, chi tiết phim và trang xem vẫn dựng được.
+
+Dải "API ngoại tuyến" ở trang chủ chỉ để nói rằng những thứ thuộc *kho* đang không chạy: Lưu phim, Xem tiếp, tìm trong DB, phụ đề, và job nhập phim ở nền. Muốn có lại thì API phải sống (xem mục trên).
 
 ### Trình duyệt báo lỗi CORS
 
