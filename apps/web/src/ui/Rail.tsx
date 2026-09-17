@@ -97,45 +97,55 @@ function useRail(count: number) {
     return () => window.clearTimeout(timer);
   }, [hover, hold, awake, cycle, count, span]);
 
-  const release = (event: Pointer<HTMLDivElement>) => {
-    const grip = drag.current;
-    if (grip.id !== event.pointerId) return;
-    grip.id = -1;
-    ref.current?.releasePointerCapture(event.pointerId);
-    setHold(false); // bỏ .dragging → scroll-snap bật lại và tự dính vào thẻ gần nhất
-    if (!grip.moved) return;
-    setCycle((c) => c + 1);
-    // Cờ "đã kéo" chỉ cần sống đủ lâu để chặn cú click ngay sau đó. Trình duyệt
-    // gửi click trước khi tới lượt hàng đợi hẹn giờ, nên xoá ở đây là an toàn —
-    // và tránh cờ cũ ăn mất một lần bấm Enter về sau.
-    setTimeout(() => { drag.current.moved = false; }, 0);
-  };
-
   const handlers = {
     onPointerEnter: () => setHover(true),
     onPointerLeave: () => setHover(false),
     onFocus: () => setHover(true),
     onBlur: () => setHover(false),
+    /**
+     * Cú kéo nghe ở `window`, và **không** gọi `setPointerCapture`.
+     *
+     * Bản cũ khoá con trỏ ngay lúc `pointerdown`, mà Chrome chuyển cả
+     * `pointerup` lẫn `click` sang phần tử đang giữ con trỏ: cú bấm vào một thẻ
+     * phim không bao giờ tới được thẻ `<a>`, nên bấm phim ở trang chủ không mở
+     * được gì. Nghe ở `window` làm đúng việc mà pointer capture từng làm — con
+     * trỏ rời khỏi dải giữa cú kéo vẫn nhận được sự kiện — mà không đổi đích
+     * của cú bấm.
+     */
     onPointerDown: (event: Pointer<HTMLDivElement>) => {
       // Cảm ứng bỏ qua: trình duyệt đã cuộn có quán tính, tự tính lại chỉ kém hơn.
       const el = ref.current;
       if (!el || event.pointerType === 'touch' || event.button !== 0) return;
-      drag.current = { id: event.pointerId, from: event.clientX, left: el.scrollLeft, moved: false };
-      el.setPointerCapture(event.pointerId);
+      const id = event.pointerId;
+      drag.current = { id, from: event.clientX, left: el.scrollLeft, moved: false };
       setHold(true);
+      const move = (raw: PointerEvent) => {
+        if (raw.pointerId !== id) return;
+        const grip = drag.current;
+        const shift = raw.clientX - grip.from;
+        if (Math.abs(shift) > 5) grip.moved = true;
+        el.scrollLeft = grip.left - shift;
+      };
+      const finish = (raw: PointerEvent) => {
+        if (raw.pointerId !== id) return;
+        window.removeEventListener('pointermove', move, true);
+        window.removeEventListener('pointerup', finish, true);
+        window.removeEventListener('pointercancel', finish, true);
+        drag.current.id = -1;
+        setHold(false); // bỏ .dragging → scroll-snap bật lại và tự dính vào thẻ gần nhất
+        if (!drag.current.moved) return;
+        setCycle((c) => c + 1);
+        // Cờ "đã kéo" chỉ cần sống đủ lâu để chặn cú click ngay sau đó. Trình duyệt
+        // gửi click trước khi tới lượt hàng đợi hẹn giờ, nên xoá ở đây là an toàn —
+        // và tránh cờ cũ ăn mất một lần bấm Enter về sau.
+        setTimeout(() => { drag.current.moved = false; }, 0);
+      };
+      window.addEventListener('pointermove', move, true);
+      window.addEventListener('pointerup', finish, true);
+      // Mất con trỏ giữa cú kéo (chuột bị nhấc, cử chỉ hệ thống chen vào) mà không
+      // dọn thì .dragging dính mãi: dải hết tự cuốn và con trỏ kẹt ở hình bàn tay.
+      window.addEventListener('pointercancel', finish, true);
     },
-    onPointerMove: (event: Pointer<HTMLDivElement>) => {
-      const el = ref.current;
-      const grip = drag.current;
-      if (!el || grip.id !== event.pointerId) return;
-      const shift = event.clientX - grip.from;
-      if (Math.abs(shift) > 5) grip.moved = true;
-      el.scrollLeft = grip.left - shift;
-    },
-    onPointerUp: release,
-    // Mất con trỏ giữa cú kéo (chuột bị nhấc, cử chỉ hệ thống chen vào) mà không
-    // dọn thì .dragging dính mãi: dải hết tự cuốn và con trỏ kẹt ở hình bàn tay.
-    onPointerCancel: release,
     // Thả tay sau khi kéo sẽ sinh một cú click trên thẻ đang ở dưới con trỏ:
     // chặn ở pha capture, nếu không mỗi lần kéo là một lần bị điều hướng.
     onClickCapture: (event: ReactMouse<HTMLDivElement>) => {
