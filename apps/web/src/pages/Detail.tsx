@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ExternalLink, Heart, Play, RefreshCw, Users } from 'lucide-react';
 import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFavoriteMutation } from '../api';
+import { episodesFromVsmov } from '../vsmov';
 import { useVsmovDetail } from '../useVsmov';
 import { preloadPlayer } from '../chunks';
 import { filmSources, filmSourceUrl } from '../filmSources';
@@ -57,25 +58,7 @@ function CastLinks({ cast, names, kind }: { cast: CastMember[]; names: string[];
   return <>{names.join(', ') || 'Đang cập nhật'}</>;
 }
 
-/**
- * Nhóm tập từ vsmov (chưa có id trong kho) đổi sang `Episode[]` với id âm —
- * đủ để bấm xem (`Watch` dùng link phát chứ không truy vấn id khi có state),
- * và không đụng id thật của kho khi ingest xong.
- */
-function episodesFromVsmov(groups: { server_name: string; server_data: { name: string; link_embed: string; link_m3u8: string | null }[] }[], slug: string): Episode[] {
-  const episodes: Episode[] = [];
-  for (const group of groups) {
-    for (const entry of group.server_data) {
-      const number = Number.parseInt(String(entry.name ?? '').replace(/\D/g, ''), 10);
-      episodes.push({
-        id: -(episodes.length + 1), movieId: 0, serverName: group.server_name,
-        name: entry.name, episodeNumber: Number.isFinite(number) ? number : null,
-        embedUrl: entry.link_embed, m3u8Url: entry.link_m3u8
-      });
-    }
-  }
-  return episodes;
-}
+
 
 /**
  * Khung xương cho lúc chưa có cả bản mô tả (mở thẳng URL, hoặc F5 giữa trang).
@@ -116,8 +99,10 @@ export default function Detail() {
    * của trang ngay khi điều hướng, trong lúc API còn đang kéo danh sách tập về.
    */
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
-  const movie: Movie | null = fetched ?? (direct.data ? ({ ...direct.data.movie, episodes: episodesFromVsmov(direct.data.episodes, direct.data.movie.slug) } as Movie) : null) ?? preview;
+  const movie: Movie | null = fetched ?? (direct.data ? ({ ...direct.data.movie, episodes: episodesFromVsmov(direct.data.episodes) } as Movie) : null) ?? preview;
   const failed = result.isError || Boolean(progress.failure);
+  /** Chỉ kho mới có id thật: lưu phim và làm mới nguồn đều cần id đó. */
+  const inStore = Boolean(fetched && fetched.id > 0);
   // Hook entrance phải đứng trước mọi `return` có điều kiện (luật hooks):
   // đổi slug thì diễn lại từ đầu, còn skeleton/error thì ref không gắn vào đâu.
   const scope = useHeroEntrance<HTMLElement>([slug]);
@@ -159,8 +144,8 @@ export default function Detail() {
               ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`} state={{ preview: movie }} onPointerDown={preloadPlayer}><Play fill="currentColor" />Xem ngay</Link>
               : <button className="button primary" disabled><Play />{loading ? 'Đang tải nguồn phát' : 'Chưa có tập'}</button>}
             {/* Lưu phim cần id trong kho — bản mô tả từ thẻ phim chưa có id. */}
-            {fetched ? <FavoriteButton movieId={fetched.id} /> : null}
-            {pathname.startsWith('/movie/') && !loading ? <ImportButton slug={slug} /> : null}
+            {inStore && fetched ? <FavoriteButton movieId={fetched.id} /> : null}
+            {pathname.startsWith('/movie/') && !loading && inStore ? <ImportButton slug={slug} /> : null}
           </div>
         </div>
       </div>

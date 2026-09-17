@@ -1,6 +1,8 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { bootUrl, claimBoot } from './boot';
+import { apiUnavailable, catalogTarget } from './catalogFallback';
+import { vsmovTarget } from './vsmov';
 import type { CatalogQuery, Episode, ImportJob, Movie, MovieList, Navigation, Person, PersonList, SubtitleFile, SubtitleSearch, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
 /**
@@ -98,8 +100,31 @@ export interface MovieResponse{movie:Movie|null;importing?:ImportJob|null}
  * Nhặt lại request đã bắn trước từ `index.html` (`fromBoot`), rồi đi đường thường.
  * Nguồn phim duy nhất là VSMOV nên không còn `?source=` hay ghi nhận nguồn trả lời.
  */
+/**
+ * Đọc thẳng nguồn khi **API** không trả lời — xem `catalogFallback.ts` cho lý do
+ * và bảng route.
+ *
+ * Đây là nhánh cứu, không phải nhánh chính: API trả lời được thì không ai gọi
+ * tới đây. Nguồn cũng lỗi thì trả `null` để lỗi cũ đi tiếp — người dùng nhận
+ * đúng câu "không tải được dữ liệu" thay vì một lỗi khác khó hiểu hơn.
+ */
+async function fromVsmov(args:string|FetchArgs):Promise<unknown|null>{
+  const target=catalogTarget(args);
+  if(!target)return null;
+  try{
+    return await vsmovTarget(target);
+  }catch{
+    return null;
+  }
+}
+
 const baseQuery:BaseQueryFn<string|FetchArgs,unknown,FetchBaseQueryError>=async(args,api,extra)=>{
   const result=(await fromBoot(args))??(await rawBaseQuery(args,api,extra));
+  const failure='error' in result?result.error:undefined;
+  if(failure&&apiUnavailable(failure.status)){
+    const data=await fromVsmov(args);
+    if(data!==null)return {data};
+  }
   return result;
 };
 
