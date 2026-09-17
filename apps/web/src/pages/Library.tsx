@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { useGetContinueQuery, useGetFavoritesQuery } from '../api';
-import { EmptyState, MovieCard, RailLabel, Shell, SkeletonGrid, SyncStatus } from '../ui';
+import { EmptyState, MovieCard, RailLabel, Shell, SkeletonGrid } from '../ui';
 
 export default function LibraryPage() {
   const favorites = useGetFavoritesQuery();
@@ -15,7 +15,6 @@ export default function LibraryPage() {
           <h1>Thư viện</h1>
           <p>Phim đã lưu và đang xem dở</p>
         </div>
-        <SyncStatus />
       </div>
 
       <section className="library-section">

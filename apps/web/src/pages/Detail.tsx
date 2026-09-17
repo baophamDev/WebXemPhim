@@ -1,11 +1,10 @@
 import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { ExternalLink, Heart, Play, RefreshCw, Users } from 'lucide-react';
+import { Heart, Play, RefreshCw, Users } from 'lucide-react';
 import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFavoriteMutation } from '../api';
 import { episodesFromVsmov } from '../vsmov';
 import { useVsmovDetail } from '../useVsmov';
 import { preloadPlayer } from '../chunks';
-import { filmSources, filmSourceUrl } from '../filmSources';
 import { previewFromState, recallMovie, rememberMovie } from '../preview';
 import type { CastMember, Episode, Movie } from '../types';
 import { Breadcrumb, clean, EmptyState, ErrorState, image, ImportPanel, RailLabel, Shell, Spec, useImportProgress } from '../ui';
@@ -154,22 +153,6 @@ export default function Detail() {
       {loading
         ? <ImportPanel progress={progress} onRetry={() => { progress.retry(); result.refetch(); }} />
         : <EpisodeList movie={movie} />}
-      <section className="film-sources">
-        <div className="section-heading">
-          <div><RailLabel prefix="NGUỒN NGOÀI">Theo slug</RailLabel><h2>Mở trên trang nguồn</h2></div>
-        </div>
-        <div className="source-link-grid">
-          {filmSources.map((source) => <a
-            key={source.id}
-            className="button ghost"
-            href={filmSourceUrl(source, movie.slug)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <ExternalLink />{source.label}
-          </a>)}
-        </div>
-      </section>
       <section className="detail-info">
         <div>
           <RailLabel prefix="THÔNG TIN">Chi tiết</RailLabel>

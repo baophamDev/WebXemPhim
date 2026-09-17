@@ -311,13 +311,12 @@ Sai:  bao-nhan-cinema.vercel.app
 
 API không tự đồng bộ catalog khi restart. Điều này tránh Railway tạo tác vụ nặng ngoài ý muốn.
 
-Sau khi frontend kết nối API thành công:
+Nút **Đồng bộ** trên web đang tạm bỏ, nên việc đồng bộ gọi thẳng endpoint (endpoint
+vẫn công khai như trước, xem mục [10](#10-dữ-liệu-và-bảo-mật)):
 
-1. Mở trang chủ BảoNhànCinema.
-2. Tìm khối trạng thái **Dữ liệu local**.
-3. Chọn **Đồng bộ**.
-4. Chờ trạng thái chuyển từ `running` sang `completed`.
-5. Kiểm tra bảng `movies` và `episodes` trong Supabase Table Editor.
+1. Gọi `POST /api/sync/start` với thân `{"pages":3}`.
+2. Chờ trạng thái chuyển từ `running` sang `completed`.
+3. Kiểm tra bảng `movies` và `episodes` trong Supabase Table Editor.
 
 Có thể gọi trực tiếp bằng PowerShell:
 
@@ -657,5 +656,5 @@ Nếu đã hiểu các bước trên, checklist tối thiểu là:
 6. Deploy Vercel với `VITE_API_URL=https://RAILWAY-DOMAIN/api`.
 7. Lấy domain Vercel.
 8. Cập nhật Railway `WEB_ORIGIN` bằng domain Vercel.
-9. Refresh frontend và chạy đồng bộ 1–3 trang.
+9. Chạy đồng bộ 1–3 trang qua `POST /api/sync/start` (nút **Đồng bộ** trên web đang tạm bỏ).
 10. Kiểm tra dữ liệu trong Supabase.

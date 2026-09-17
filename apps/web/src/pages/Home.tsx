@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Pause, Play, Star } from 'lucide-react';
 import { useGetCatalogQuery, useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
-import { clean, BackToTop, ErrorState, Header, image, NavigationEffects, RailLabel, Shell, SiteFooter, SkeletonGrid, Spec, SyncStatus, useHeroRotation, useWarmDetail } from '../ui';
+import { clean, BackToTop, ErrorState, Header, image, NavigationEffects, RailLabel, Shell, SiteFooter, SkeletonGrid, Spec, useHeroRotation, useWarmDetail } from '../ui';
 import { HeroPanelBeam } from '../ui/beam';
 import { MovieRow } from '../ui/Rail';
 import { useHeroEntrance, useHeroPin, useFloatingHeader, useSmoothScroll } from '../ui/motion';
@@ -184,7 +184,6 @@ export default function Home() {
     return <Shell flush>
       <div className="hero-skeleton" />
       <div className="page-container page-top">
-        <SyncStatus />
         <SkeletonGrid />
       </div>
       <BackToTop />
@@ -225,7 +224,6 @@ function HomePinned({ rotation, warm, home, series, movies, cinema, ultra, items
     <div className="app-frame home-frame">
       <main>
         <div className="page-container page-top home-sheet">
-          <SyncStatus />
           {home.isLoading
             ? <SkeletonGrid />
             : <MovieRow label="Mới cập nhật" title="Vừa thêm vào kho" items={items} to="/browse/list/phim-moi-cap-nhat" />}

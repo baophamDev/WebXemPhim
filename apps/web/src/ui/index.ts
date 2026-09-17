@@ -11,7 +11,7 @@ export { useDebounced, useDropdown } from './hooks';
 export { useHeroRotation } from './heroRotate';
 export { Logo, Shell, Header, SiteFooter, NavigationEffects } from './Shell';
 export { MovieCard, RailLabel, Spec, useWarmDetail } from './cards';
-export { EmptyState, ErrorState, RouteFallback, SkeletonGrid, SyncStatus } from './states';
+export { EmptyState, ErrorState, RouteFallback, SkeletonGrid } from './states';
 export { BackToTop, Breadcrumb, Pagination } from './nav';
 export { ImportPanel, TopProgress, useImportProgress, type ImportProgress } from './progress';
 export { ThemePicker } from './pickers';
