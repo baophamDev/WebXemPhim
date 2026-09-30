@@ -31,9 +31,13 @@ services/api/src/db.ts    Kết nối PostgreSQL
 services/api/src/http.ts  Vỏ bọc route: bắt lỗi async, Cache-Control cho route chỉ đọc
 services/api/src/importer.ts Hàng đợi nhập phim chạy ở nền
 services/api/src/providers/ Tầng nguồn catalog (nhiều nguồn, có fallback)
+scripts/local-db.mjs      Cụm PostgreSQL local, `npm run dev` tự bật
+scripts/wait-for-api.mjs  Đợi API mở cổng rồi mới mở Vite
 supabase/migrations/      Schema PostgreSQL
 BaoNhanCinema/            App TV LG (webOS) — nội dung file .ipk
 build-ipk.cmd             Đóng gói/cài .ipk lên TV LG
+android/                  App Android (APK) — vỏ WebView, bản web nằm trong APK
+build-apk.cmd             Đóng gói/cài .apk lên điện thoại hoặc Android TV box
 railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
@@ -43,6 +47,8 @@ Nguồn catalog là **một tầng nhiều nguồn có thứ tự ưu tiên** (`
 Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn việc kéo dữ liệu về chạy ở nền và có thanh tiến trình riêng — mục [12](#12-mở-một-phim-chưa-có-trong-db).
 
 App cho TV LG là **hosted web app**: file `.ipk` chỉ chứa `appinfo.json` + icon, còn nội dung lấy thẳng từ domain Vercel. Nghĩa là sửa web chỉ cần `git push`, không đóng gói lại. Hướng dẫn đầy đủ ở [docs/webos.md](docs/webos.md).
+
+App cho Android thì ngược lại: **app cài trong máy** (local app) — APK chứa luôn bản build của `apps/web`, mở là chạy và không phụ thuộc Vercel. Dữ liệu phim vẫn phải lấy từ API, và API đó đổi được ngay trong app: mặc định là Railway, muốn xem kho trong nhà thì trỏ sang API chạy trên máy tính (không cần build lại APK). Hướng dẫn đầy đủ ở [docs/android.md](docs/android.md).
 
 Player dùng trực tiếp link HLS hoặc trang nhúng mà nguồn trả về; API không proxy hay chỉnh sửa playlist, nên request phát không phải đi qua thêm một chặng xử lý.
 
@@ -57,6 +63,8 @@ Trước khi bắt đầu, cần có:
 - Tài khoản Railway.
 - Tài khoản Vercel.
 - Node.js 22 trở lên nếu muốn chạy local.
+- PostgreSQL 14 trở lên nếu muốn chạy local mà không cần Supabase — dev dùng cụm
+  trong `.tools/pgdata`, xem mục 8.1.
 
 Không đưa password database hoặc chuỗi `DATABASE_URL` vào GitHub.
 
@@ -337,41 +345,59 @@ Invoke-RestMethod "https://YOUR-RAILWAY-DOMAIN.up.railway.app/api/sync/status"
 
 Không nên đồng bộ quá nhiều trang ngay lần đầu. Bắt đầu với 1–3 trang để kiểm tra database và mức sử dụng Railway/Supabase.
 
-## 8. Chạy local với Supabase
+## 8. Chạy local
 
-### 8.1. Tạo file môi trường backend
+### 8.1. Database: mặc định là PostgreSQL tại chỗ
+
+`npm run dev` tự bật một cụm PostgreSQL nằm trong `.tools/pgdata` (đã có trong
+`.gitignore`) ở cổng `55432`, dùng binary PostgreSQL đã cài trên máy — không cần
+Docker, không cần tài khoản Supabase, không đụng tới service PostgreSQL nào khác
+đang chạy ở cổng 5432. Script `scripts/local-db.mjs` lo việc đó:
+
+```powershell
+npm run db:start     # tạo cụm lần đầu, bật lên, tạo database "cinema"
+npm run db:status    # đang chạy hay không
+npm run db:stop      # tắt cụm (dữ liệu vẫn còn trong .tools/pgdata)
+```
+
+Muốn xoá sạch dữ liệu dev thì tắt cụm rồi xoá thư mục `.tools/pgdata`; lần chạy
+sau sẽ tạo lại từ đầu. Cần PostgreSQL 14 trở lên; nếu script không tìm thấy bản
+cài, đặt biến `PGBIN` trỏ tới thư mục `bin` của nó.
+
+`services/api/.env` đã trỏ sẵn vào cụm đó:
+
+```env
+DATABASE_URL=postgresql://postgres@127.0.0.1:55432/cinema
+DATABASE_SSL=false
+```
+
+Không cần SSL vì database nằm cùng máy — để `DATABASE_SSL=true` là PostgreSQL
+local từ chối kết nối. Khi `DATABASE_URL` trỏ về `localhost`/`127.0.0.1`, API tự
+hiểu là không dùng SSL kể cả khi quên đặt biến.
+
+### 8.2. Chạy với Supabase thật (tuỳ chọn)
+
+Production dùng Supabase, còn local thì không bắt buộc. Muốn dev thẳng vào
+Supabase, thay `DATABASE_URL` trong `services/api/.env` bằng pooler URL thật và
+đặt `DATABASE_SSL=true`:
+
+```env
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres
+DATABASE_SSL=true
+```
+
+Lúc đó `npm run dev` tự bỏ qua cụm local (script thấy URL không trỏ về máy này).
+
+### 8.3. Cài và chạy
 
 Tại thư mục gốc dự án, chạy PowerShell:
 
 ```powershell
-Copy-Item .env.example services/api/.env
-```
-
-Mở `services/api/.env` và thay `DATABASE_URL` bằng Transaction Pooler URL thật.
-
-Giữ cấu hình local:
-
-```env
-PORT=4000
-HOST=0.0.0.0
-WEB_ORIGIN=http://localhost:5173
-DATABASE_SSL=true
-DATABASE_POOL_SIZE=5
-CATALOG_SOURCES=vsmov,motchillu,motchillv,phim4k,phimmoichill,phimmoichill-win,vieflix,tmdb,tvdb
-VSMOV_API_URL=https://vsmov.com/api
-```
-
-Chạy local không có khoá TMDB/TVDB vẫn được: nguồn thiếu khoá tự tắt kèm một dòng cảnh báo ở console (`[catalog] bỏ qua nguồn tvdb: thiếu TVDB_API_KEY`), phần còn lại của web chạy bình thường. Nút **Nguồn phim** trên header hiện nguồn đó ở dạng mờ kèm lý do.
-
-`VITE_API_URL` không bắt buộc khi chạy local vì Vite proxy `/api` sang `http://localhost:4000`.
-
-### 8.2. Cài và chạy
-
-Nếu repository chưa có `node_modules`:
-
-```powershell
 npm install
 ```
+
+Nếu chưa có `services/api/.env`, `npm run dev` tự tạo nó từ `.env.example` (bản
+mẫu đã trỏ sẵn vào cụm PostgreSQL local) — không cần copy tay.
 
 Chạy cả frontend và backend:
 
@@ -384,6 +410,12 @@ Hoặc:
 ```powershell
 npm run dev
 ```
+
+`npm run dev` chạy theo thứ tự: bật database local (`predev`), dựng API, đợi
+`/api/health` trả lời rồi mới mở Vite — nhờ vậy log không còn
+`AggregateError [ECONNREFUSED]` do web hỏi API trước khi API kịp `listen()`.
+`VITE_API_URL=/api` trong `apps/web/.env` đi qua proxy của Vite sang
+`http://127.0.0.1:4000` (xem `apps/web/vite.config.ts`).
 
 Địa chỉ local:
 
@@ -579,6 +611,31 @@ Hàng đợi nằm trong RAM của một tiến trình, nên chạy nhiều inst
 
 ## 13. Xử lý lỗi thường gặp
 
+### `npm run dev` đầy `AggregateError [ECONNREFUSED]` khi proxy `/api`
+
+Web hỏi API trước khi API kịp mở cổng (Vite sẵn sàng sau ~1s, `tsx watch` còn phải
+build). Từ giờ `apps/web` có `predev` đợi `/api/health` trả lời rồi mới mở Vite,
+còn proxy trỏ `127.0.0.1:4000` thay vì `localhost:4000` (trên Windows `localhost`
+phân giải ra cả `::1`, mà API chỉ listen IPv4 `0.0.0.0`). Nếu vẫn thấy lỗi này,
+kiểm tra API có sống không: `Invoke-RestMethod http://127.0.0.1:4000/api/health`.
+
+### `Database init failed (...) tenant/user postgres.<ref> not found`
+
+Pooler của Supabase trả câu này khi **project không còn tồn tại** (đã xoá, hoặc bị
+tạm ngưng quá lâu) — không phải lỗi DNS, cũng không phải sai mật khẩu, nên thử
+lại bao nhiêu lần cũng vô ích. Từ giờ API nhận ra nhóm lỗi cấu hình này, báo một
+dòng rõ ràng rồi chỉ thử lại mỗi 5 phút thay vì spam log:
+
+```text
+DATABASE_URL sai cấu hình (project Supabase không tồn tại hoặc đã bị tạm ngưng): ...
+  Chạy `npm run db:start` để dùng PostgreSQL local, hoặc sửa DATABASE_URL trong services/api/.env rồi khởi động lại API.
+```
+
+Cách sửa: `npm run db:start` để dev bằng PostgreSQL tại chỗ (mục [8.1](#81-database-mặc-định-là-postgresql-tại-chỗ)),
+hoặc tạo project Supabase mới rồi dán pooler URL vào `services/api/.env` (mục
+[8.2](#82-chạy-với-supabase-thật-tuỳ-chọn)). API vẫn phục vụ catalog trong lúc
+chờ, chỉ các tính năng cần DB (yêu thích, xem tiếp, nhập phim) là chưa chạy.
+
 ### Railway báo `DATABASE_URL is required`
 
 Chưa thêm `DATABASE_URL` vào Railway Variables hoặc tên biến bị viết sai. Tên phải viết hoa chính xác.
@@ -596,7 +653,10 @@ Kiểm tra:
 
 ### Health check trả 502/503
 
-Mở Railway deployment logs. API chỉ bắt đầu listen sau khi kết nối database và tạo schema thành công, nên lỗi database sẽ làm health check thất bại.
+Mở Railway deployment logs. API mở cổng trước rồi mới nối database ở nền (để
+Railway không đánh rớt service trong lúc Supabase ngủ), nên `/api/health` vẫn trả
+`200` với `"database": "connecting"` kèm `databaseError` khi DB chưa lên. Log lúc
+khởi động mới là chỗ nói rõ nguyên nhân.
 
 ### Website Vercel báo `Failed to fetch`
 
@@ -606,6 +666,7 @@ Kiểm tra:
 2. API health Railway có mở được trực tiếp không.
 3. `WEB_ORIGIN` có đúng domain Vercel và không chứa `/api` không.
 4. Sau khi sửa biến Vercel, đã redeploy frontend chưa. Biến `VITE_*` được đóng vào lúc build nên sửa biến mà không redeploy sẽ chưa có tác dụng.
+
 ### API Railway trả `404 Application not found`
 
 Edge của Railway trả đúng câu này khi **không còn service nào đứng sau domain**: project bị xoá, service bị xoá, hoặc credit của trial đã hết. Đây không phải lỗi của web — kiểm tra bằng `curl.exe -s https://<app>.up.railway.app/api/health`, ra `{"status":"error","code":404,"message":"Application not found"}` nghĩa là phải tạo lại service (hoặc nạp credit) rồi trỏ `VITE_API_URL` sang domain mới. Domain đổi thì phải redeploy frontend, vì biến `VITE_*` được đóng vào bundle lúc build.
@@ -615,7 +676,6 @@ Edge của Railway trả đúng câu này khi **không còn service nào đứng
 Catalog không phụ thuộc hoàn toàn vào API: nguồn vsmov trả `Access-Control-Allow-Origin: *` nên **trình duyệt** gọi thẳng được, và [apps/web/src/catalogFallback.ts](apps/web/src/catalogFallback.ts) dịch route catalog của API sang request tương ứng của nguồn khi API không trả lời (lỗi mạng, 404, 5xx, hoặc rewrite trả HTML). Nhờ vậy trang chủ, khám phá, menu, chi tiết phim và trang xem vẫn dựng được.
 
 Dải "API ngoại tuyến" ở trang chủ chỉ để nói rằng những thứ thuộc *kho* đang không chạy: Lưu phim, Xem tiếp, tìm trong DB, phụ đề, và job nhập phim ở nền. Muốn có lại thì API phải sống (xem mục trên).
-
 ### Trình duyệt báo lỗi CORS
 
 Thêm origin đang hiển thị trong lỗi vào `WEB_ORIGIN` trên Railway. Nhiều origin được phân cách bằng dấu phẩy, không có wildcard tự động.
