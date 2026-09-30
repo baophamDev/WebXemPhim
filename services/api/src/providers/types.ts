@@ -1,12 +1,14 @@
 /**
- * Kiểu dữ liệu catalog — nguồn duy nhất là VSMOV.
+ * Kiểu dữ liệu catalog — VSMOV là nguồn chính, KKPhim là nguồn dự phòng.
  *
- * Mọi hàm trong `vsmov.ts` trả shape đã chuẩn hoá (`ListPage`/`Taxonomy`/
- * `SourceDetail`) chứ không phải payload thô của nguồn.
+ * Mọi hàm trong `vsmov.ts`/`kkphim.ts` trả shape đã chuẩn hoá (`ListPage`/
+ * `Taxonomy`/`SourceDetail`) chứ không phải payload thô của nguồn.
  */
 
 /**
- * Bộ lọc đúng nghĩa của VSMOV, đối chiếu từng endpoint bằng request thật:
+ * Bộ lọc đúng nghĩa của VSMOV, đối chiếu từng endpoint bằng request thật.
+ * KKPhim (nguồn dự phòng) dùng chung interface này nhưng tự bỏ những tham số
+ * nguồn đó không đọc — xem ghi chú đầu `kkphim.ts`.
  *
  * - `page` + `limit`: hoạt động ở `/tim-kiem` và `/the-loai|/quoc-gia|/nam/:slug`,
  *   còn nhóm `/danh-sach/:slug` tự ép limit riêng (24 hoặc 20) và **bỏ qua limit**.
@@ -101,8 +103,8 @@ export interface SourceDetail {
   episodes: EpisodeGroup[];
 }
 
-/** Chi tiết một phim kèm danh sách tập phát được từ VSMOV. */
-export interface VsmovDetail extends SourceDetail {
-  /** Nguồn đã trả lời — luôn là `vsmov`, giữ để client hiển thị. */
+/** Chi tiết một phim kèm danh sách tập phát được; `source` là nguồn đã trả lời. */
+export interface CatalogDetail extends SourceDetail {
+  /** `vsmov` hoặc `kkphim` — resolver đặt theo nguồn thắng, giữ để client hiển thị. */
   source: string;
 }

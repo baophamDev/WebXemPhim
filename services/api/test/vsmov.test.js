@@ -1,7 +1,9 @@
 /**
- * Nguồn duy nhất VSMOV: validate shape ở biên, chuẩn hoá list/detail.
+ * Nguồn chính VSMOV đi qua resolver: validate shape ở biên, chuẩn hoá list/detail.
  *
- * Không request mạng nào: `globalThis.fetch` bị thay bằng stub.
+ * Không request mạng nào: `globalThis.fetch` bị thay bằng stub. Khi VSMOV trả lời
+ * được (như mọi ca ở file này) thì resolver không hỏi tới KKPhim — chuỗi dự phòng
+ * có test riêng ở `kkphim.test.js`.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -54,8 +56,8 @@ function stub(extra = {}) {
   seenUrls = [];
 }
 
-test('catalog.names chỉ có vsmov', () => {
-  assert.deepEqual(catalog.names, ['vsmov']);
+test('catalog.names: vsmov chính, kkphim dự phòng', () => {
+  assert.deepEqual(catalog.names, ['vsmov', 'kkphim']);
 });
 
 test('home chuẩn hoá list và đóng dấu source', async () => {

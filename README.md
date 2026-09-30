@@ -42,7 +42,7 @@ railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
 
-Nguồn catalog là **một tầng nhiều nguồn có thứ tự ưu tiên** (`CATALOG_SOURCES`), không phải một nguồn duy nhất: nguồn đầu lỗi thì tự rơi xuống nguồn sau, các nguồn web đọc theo slug bổ sung link tập, và các nguồn `metadata` (TMDB, TheTVDB) bồi vào chỗ trống. Người xem đổi được nguồn ưu tiên ngay trên header, xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
+Nguồn catalog có hai tầng: **VSMOV là nguồn chính, KKPhim (`phimapi.com`) thay thế khi VSMOV lỗi, trả rỗng hoặc hết luồng phát** (VSMOV đang trả `link_m3u8` rỗng ở mọi tập), xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
 
 Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn việc kéo dữ liệu về chạy ở nền và có thanh tiến trình riêng — mục [12](#12-mở-một-phim-chưa-có-trong-db).
 
@@ -160,6 +160,7 @@ DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supa
 DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
 VSMOV_API_URL=https://vsmov.com/api
+KKPHIM_API_URL=https://phimapi.com
 WEB_ORIGIN=http://localhost:5173
 HOST=0.0.0.0
 ```
@@ -171,19 +172,10 @@ Giải thích:
 | `DATABASE_URL` | Kết nối PostgreSQL Supabase |
 | `DATABASE_SSL` | Bật SSL khi kết nối Supabase |
 | `DATABASE_POOL_SIZE` | Số connection tối đa của một API instance |
-| `CATALOG_SOURCES` | Danh sách nguồn catalog, **thứ tự là ưu tiên**. Sáu nguồn web dùng slug được bật mặc định sau VSMOV |
-| `VSMOV_API_URL` | Base URL của nguồn VSMOV |
-| `TMDB_ACCESS_TOKEN` | Token v4 của TMDB. Không có thì dùng `TMDB_API_KEY` (khoá v3); không có cả hai thì nguồn tmdb tự tắt |
-| `TMDB_LANGUAGE` | Ngôn ngữ metadata TMDB, mặc định `vi-VN` |
-| `TVDB_API_KEY` | Khoá TheTVDB v4. Không đặt thì nguồn tvdb tự tắt |
-| `TVDB_PIN` | Chỉ cần cho khoá loại "user-supported" của TheTVDB |
-| `TVDB_LANGUAGE` | Ngôn ngữ TVDB, mã ISO 639-2/B ba chữ, mặc định `vie` |
-| `TVDB_COUNTRIES` | Các nước mà trang danh sách TVDB gộp lại, mặc định `chn,kor,jpn` |
+| `VSMOV_API_URL` | Base URL của nguồn VSMOV (nguồn chính) |
+| `KKPHIM_API_URL` | Base URL của KKPhim, mặc định `https://phimapi.com` (nguồn thay thế khi VSMOV chết) |
 | `WEB_ORIGIN` | Những frontend domain được phép gọi API bằng trình duyệt |
 | `HOST` | Cho phép Railway truy cập Express server |
-| `SOURCE_<NAME>_URL` | Tuỳ chọn: thay domain của nguồn web tương ứng khi nguồn đổi địa chỉ |
-
-`CATALOG_PROVIDER` của bản cũ vẫn được đọc nếu chưa có `CATALOG_SOURCES`, nhưng nên đổi sang tên mới.
 
 Không tự tạo biến `PORT`. Railway tự cung cấp `PORT` cho ứng dụng.
 
@@ -459,123 +451,40 @@ Lint là dependency mới, nên lần đầu phải chạy `npm install` ở th�
 Tất cả nguồn nằm ở `services/api/src/providers/`:
 
 ```text
-types.ts      Hợp đồng CatalogSource + các kiểu dữ liệu chuẩn
-normalize.ts  Chuẩn hoá + kiểm tra shape ở biên, khớp phim giữa hai nguồn
+types.ts      Kiểu dữ liệu chuẩn (ListPage/Taxonomy/SourceDetail) + bộ lọc
+normalize.ts  Chuẩn hoá + kiểm tra shape ở biên (zod)
 http.ts       fetch dùng chung: timeout, cache theo TTL
-resolver.ts   Chọn nguồn, fallback, circuit breaker, bồi metadata
-vsmov.ts      Nguồn playable (có link tập)
-web.ts        Sáu nguồn web playable, đọc trang phim theo slug
-tmdb.ts       Nguồn metadata (không có link tập)
-tvdb.ts       Nguồn metadata thứ hai (TheTVDB v4, mạnh về phim bộ châu Á)
-index.ts      Đăng ký nguồn, đọc CATALOG_SOURCES
+vsmov.ts      Nguồn chính (vsmov.com/api)
+kkphim.ts     Nguồn thay thế (phimapi.com — KKPhim, cùng gốc OPhim CMS)
+index.ts      Resolver: VSMOV trước, KKPhim sau, gắn `source` vào kết quả
 ```
 
-Hai loại nguồn khác nhau ở chỗ được phép trả gì:
-
-| Loại | Ví dụ | Được dùng cho |
-| --- | --- | --- |
-| `playable` | vsmov, các nguồn web slug | VSMOV cung cấp catalog; các nguồn web bổ sung link tập theo slug |
-| `metadata` | tmdb, tvdb | Chỉ lấp chỗ trống: poster, mô tả, năm, điểm, diễn viên |
-
-MyDramaList (`mdl`) có tên trong bảng nguồn nhưng chưa có adapter — API của họ chưa mở công khai. Nó hiện mờ trong danh sách nguồn kèm lý do thay vì bị giấu đi, vì một danh sách thiếu tên trông như lỗi.
-
-Mọi method trong `CatalogSource` đều **optional**. Resolver hỏi `typeof source.byGenre === 'function'` trước khi gọi, nên một nguồn chỉ có `search` vẫn đăng ký được — nó chỉ đơn giản là bị bỏ qua ở những khả năng nó không có.
+Vì sao có hai nguồn: VSMOV chặn IP datacenter (Railway từng bị 403) và từ 2026-09 trả `link_m3u8` rỗng ở mọi tập — embed chỉ còn player giả nên bấm vào tập là màn hình đen. KKPhim có `link_m3u8` thật và trả `Access-Control-Allow-Origin: *`.
 
 ### 11.1. Cách resolver chọn nguồn
 
-1. Lọc ra các nguồn có khả năng đang cần, theo đúng thứ tự `CATALOG_SOURCES`.
-2. Nguồn nào đang bị circuit breaker mở thì bị đẩy xuống cuối, không bị loại — hết nguồn thì vẫn thử nó.
-3. Gọi lần lượt. Kết quả phải qua `zod` mới được nhận; sai shape bị tính là lỗi của nguồn đó.
-4. Nguồn lỗi 3 lần liên tiếp thì bị tạm ngừng 30 giây, nhân đôi mỗi lần lỗi tiếp, tối đa 10 phút. Không có bước này thì mỗi request phải đợi hết 20 giây timeout của nguồn chết trước khi sang nguồn sau.
-5. Hết mọi nguồn mới trả lỗi, và thông điệp lỗi kể tên từng nguồn cùng lý do.
+Mọi method của `catalog` (`home`, `listBySlug`, `search`, `byGenre`, `byYear`, ...) đi qua `resolve()`:
 
-Riêng `detail()` đi xa hơn: ưu tiên nguồn playable **có tập**, rồi bồi các field còn `null` từ những nguồn còn lại và dừng ngay khi đã đủ. Nguồn metadata không bao giờ ghi đè field mà nguồn playable đã có — phim nào nguồn nào phát thì nguồn đó là sự thật về tên, tập, chất lượng.
+1. Hỏi VSMOV trước. Lỗi, trả rỗng, hoặc dữ liệu sai shape thì thử KKPhim.
+2. KKPhim cũng không có thì ném lỗi cuối cùng; route ở `server.ts` bắt lỗi đó và rơi tiếp xuống DB (`homeWithFallback`, `listWithFallback`, `searchWithFallback`, `taxonomyWithFallback`).
+3. Mọi response mang thêm `source` — nguồn **thật sự** trả lời (`vsmov`, `kkphim`, hoặc `database`):
 
-Hai nguồn đặt slug khác nhau cho cùng một phim, nên khi slug không khớp, resolver tìm lại bằng tên + năm (`matchScore`, ngưỡng `0.72`) và ghi nhớ cặp slug đó. Dưới ngưỡng thì coi như không tìm thấy — thà thiếu metadata còn hơn gán poster của phim khác.
+```json
+{ "items": [], "pagination": {}, "source": "kkphim" }
+```
+
+KKPhim không có endpoint diễn viên/mã/danh sách năm — adapter trả rỗng ngay để resolver rơi xuống DB, không tốn một request 404.
+
+Riêng `detail()` đi xa hơn: nguồn được chọn phải có **ít nhất một tập kèm `link_m3u8`**. VSMOV trả về nhưng không có luồng phát thì resolver:
+
+1. Thử `/phim/:slug` bên KKPhim (một số slug trùng nhau).
+2. Không có thì tìm theo tên (`/tim-kiem`), chỉ nhận khi tên khớp hoặc năm khớp — thà thiếu nguồn phát còn hơn ghép nhầm phim.
+3. Tìm được thì dùng bản KKPhim nhưng **giữ slug người dùng mở** làm khoá bản ghi trong DB.
+4. Không tìm được thì vẫn trả bản VSMOV (còn metadata + embed) thay vì mất cả trang.
 
 ### 11.2. Thêm một nguồn
 
-Viết adapter export một object `CatalogSource`, dùng `getJson` của `http.ts` và các helper của `normalize.ts` để trả đúng shape:
-
-```ts
-export const mySource: CatalogSource = {
-  name: 'mysource',
-  kind: 'playable',
-  async search(keyword, page = 1, limit = 24) { /* ... */ },
-  async detail(slug) { /* ... */ }
-};
-```
-
-Đăng ký trong `providers/index.ts`:
-
-```ts
-const AVAILABLE: Record<string, Entry> = {
-  vsmov: { source: vsmov, kind: 'playable', enabled: true, hint: '' },
-  tmdb: { source: tmdb, kind: 'metadata', enabled: tmdbEnabled, hint: 'thiếu TMDB_ACCESS_TOKEN hoặc TMDB_API_KEY' },
-  tvdb: { source: tvdb, kind: 'metadata', enabled: tvdbEnabled, hint: 'thiếu TVDB_API_KEY' },
-  mysource: { source: mySource, kind: 'playable', enabled: Boolean(process.env.MYSOURCE_API_URL), hint: 'thiếu MYSOURCE_API_URL' }
-};
-```
-
-`enabled: false` không xoá tên nguồn khỏi `GET /api/providers` — nó vào danh sách `inactive` kèm `hint`, và web hiện mờ kèm lý do. Nguồn đã đặt tên nhưng chưa có adapter thì để `source: null` (đó là chỗ của `mdl`).
-
-Rồi đổi biến môi trường trên Railway:
-
-```env
-CATALOG_SOURCES=mysource,vsmov,tmdb,tvdb
-```
-
-Tên nguồn không có trong `AVAILABLE` sẽ làm API dừng ngay lúc khởi động — sai chính tả biến môi trường phải vỡ ồn ào, không im lặng chạy thiếu nguồn.
-
-Database không phụ thuộc tên nguồn vì phim được xác định bằng `provider` và `provider_id`.
-
-### 11.3. Xem nguồn nào đang sống
-
-```text
-GET /api/providers
-```
-
-```json
-{
-  "sources": [
-    { "name": "vsmov", "kind": "playable", "capabilities": ["home", "search", "detail"], "healthy": true, "failures": 0, "openUntil": null, "lastError": null, "lastSuccessAt": "2026-09-04T10:29:58.000Z" },
-    { "name": "tvdb", "kind": "metadata", "capabilities": ["home", "search", "detail"], "healthy": false, "failures": 3, "openUntil": "2026-09-04T10:31:00.000Z", "lastError": "Nguồn tvdb trả HTTP 401 (kiểm tra khoá API trong biến môi trường)", "lastSuccessAt": null }
-  ],
-  "inactive": [
-    { "name": "mdl", "kind": "metadata", "hint": "MyDramaList chưa mở API công khai — cần xin khoá ở mydramalist.com/api_request" }
-  ],
-  "order": ["vsmov", "motchillu", "motchillv", "phim4k", "phimmoichill", "phimmoichill-win", "vieflix", "tmdb", "tvdb"]
-}
-```
-
-`healthy: false` nghĩa là đang bị tạm ngừng, không phải nguồn đã chết hẳn; `openUntil` là lúc nó được thử lại.
-
-`inactive` là những nguồn có tên nhưng chưa dùng được (thiếu khoá, chưa có adapter), kèm `hint` nói thiếu gì.
-
-### 11.4. Đổi nguồn ưu tiên cho một request
-
-`CATALOG_SOURCES` là thứ tự mặc định của server. Từng request đổi được thứ tự đó:
-
-```text
-GET /api/catalog/home?source=tvdb
-GET /api/catalog/search?q=dien%20hy&source=tmdb
-```
-
-hoặc bằng header `x-catalog-source: tvdb` cho script và curl.
-
-Đây là **ưu tiên, không phải khoá cứng**: nguồn được chọn chỉ nhảy lên đầu hàng, mọi bước fallback ở 11.1 vẫn nguyên. Ba tính chất đi kèm, mỗi cái đổi lấy một lỗi đã gặp:
-
-- Trong `detail()`, nguồn `playable` vẫn được hỏi trước nguồn `metadata` kể cả khi đang chọn một nguồn metadata. Không có luật này thì chọn `tmdb` là tự tay tắt nút play, vì nguồn metadata không có link tập.
-- Tên nguồn không nằm trong danh sách đang bật thì trả `400` và kể tên các nguồn đang bật, không im lặng bỏ qua. Sai chính tả một lần rồi ngồi hỏi vì sao đổi nguồn không có tác dụng thì tốn thời gian hơn nhiều.
-- Mọi response catalog đều mang thêm `source` — **nguồn đã thật sự trả lời**, không phải nguồn được chọn:
-
-```json
-{ "items": [], "pagination": {}, "source": "vsmov" }
-```
-
-Trên web, nút **Nguồn phim** ở header làm đúng việc này (`apps/web/src/source.ts`): lựa chọn được nhớ trong `localStorage`, gắn vào mọi request catalog, và nút hiện luôn nguồn đang trả lời. Chọn `tvdb` rồi mở trang chủ vẫn thấy `vsmov` trả lời là chuyện bình thường — TVDB không có mục "phim mới cập nhật" — nên nút chấm màu hổ phách để nói ra chuyện đó thay vì để người dùng tin là mình đang xem dữ liệu TVDB.
-
-Đổi nguồn ở web sẽ xoá sạch cache của RTK Query. Khoá cache được tính từ tham số endpoint **trước khi** `?source=` được gắn vào, nên không xoá thì đổi nguồn xong vẫn thấy y nguyên dữ liệu cũ.
+Viết adapter export object cùng shape `vsmov`/`kkphim` (xem `kkphim.ts` làm mẫu), thêm vào mảng `PROVIDERS` trong `index.ts` — thứ tự trong mảng là thứ tự ưu tiên. Thêm test stub `globalThis.fetch` như `test/kkphim.test.js`, và thêm biến môi trường base URL vào `.env.example` + mục 4.2 nếu cần đổi domain.
 
 ## 12. Mở một phim chưa có trong DB
 
