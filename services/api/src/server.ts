@@ -8,7 +8,7 @@ import {
   listCountriesFromDb, listFavorites, listGenresFromDb, listMovies, listPeople, listYearsFromDb,
   saveProgress, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
 } from './db.js';
-import { describeFailure, shortCause } from './errors.js';
+import { describeFailure, isConfigFailure, shortCause } from './errors.js';
 import { asyncRoute, serverCachedRoute } from './http.js';
 import { cacheInvalidate, routeKey } from './cache.js';
 import { forgetImport, importJob, importQueueSize, startImport, waitForImport, type ImportJob, type Report } from './importer.js';
@@ -473,6 +473,8 @@ const port = Number(process.env.PORT ?? 4000); const host = process.env.HOST ?? 
  * healthcheck `/api/health` của Railway fail và toàn bộ web hiện "API ngoại tuyến".
  * Giờ mở cổng trước rồi migrate ở nền, tự retry — API sống lại ngay khi DB tỉnh.
  */
+/** Nhịp thử lại khi lỗi thuộc về cấu hình (xem `isConfigFailure`) — thưa, khỏi spam log. */
+const CONFIG_RETRY_MS = 5 * 60_000;
 async function initDatabaseWithRetry(attempt = 1): Promise<void> {
   try {
     await initDatabase();
@@ -480,6 +482,18 @@ async function initDatabaseWithRetry(attempt = 1): Promise<void> {
     console.log('Database ready');
   } catch (error) {
     dbState.ready = false; dbState.reason = shortCause(error);
+    if (isConfigFailure(error)) {
+      // Không phải sự cố tạm thời: database chưa từng tồn tại với cấu hình này,
+      // nên backoff dày chỉ làm log đầy lên mà không bao giờ tự khỏi.
+      if (attempt === 1) {
+        console.error(`DATABASE_URL sai cấu hình (${dbState.reason}):`, (error as Error).message);
+        console.error('  Chạy `npm run db:start` để dùng PostgreSQL local, hoặc sửa DATABASE_URL trong services/api/.env rồi khởi động lại API.');
+      } else {
+        console.error(`Database vẫn chưa kết nối được (${dbState.reason}), thử lại sau ${CONFIG_RETRY_MS / 60_000} phút.`);
+      }
+      setTimeout(() => void initDatabaseWithRetry(attempt + 1), CONFIG_RETRY_MS).unref();
+      return;
+    }
     const delay = Math.min(30_000, 2_000 * 2 ** (attempt - 1));
     console.error(`Database init failed (lần ${attempt}), thử lại sau ${delay}ms:`, (error as Error).message);
     setTimeout(() => void initDatabaseWithRetry(attempt + 1), delay).unref();

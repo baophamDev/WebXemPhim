@@ -100,6 +100,20 @@ const SQLSTATE: Record<string, string> = {
 };
 
 /**
+ * Lỗi cấu hình thì retry dày vô nghĩa: sai mật khẩu, sai project ref Supabase
+ * (`tenant/user postgres.<ref> not found` do pooler trả về khi project bị xoá
+ * hoặc tạm ngưng), database không tồn tại. Không tốn công thử lại mỗi 2–30 giây
+ * cho tới vô tận; người sửa được `.env` cần đọc một dòng rõ ràng, không phải
+ * một dòng lỗi mới mỗi lần backoff.
+ */
+const CONFIG_SQLSTATE = new Set(['28P01', '28000', '3D000', '53300']);
+export function isConfigFailure(error: unknown): boolean {
+  if (marks(error).some((mark) => CONFIG_SQLSTATE.has(mark))) return true;
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /tenant\/user .* not found/i.test(message) || /DATABASE_URL is required/i.test(message);
+}
+
+/**
  * Lý do ngắn cho `/api/health`: đủ để biết phải sửa DNS, mật khẩu hay firewall,
  * nhưng không kèm host/cổng/tên bảng vì endpoint này công khai. Message đầy đủ vẫn
  * nằm trong log lúc khởi động.
@@ -107,6 +121,7 @@ const SQLSTATE: Record<string, string> = {
 export function shortCause(error: unknown): string {
   const found = marks(error);
   const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/tenant\/user .* not found/i.test(message)) return 'project Supabase không tồn tại hoặc đã bị tạm ngưng';
   for (const mark of found) if (SQLSTATE[mark]) return SQLSTATE[mark];
   if (found.includes('ENOTFOUND') || found.includes('EAI_AGAIN')) return 'không phân giải được tên miền';
   if (found.includes('ECONNREFUSED')) return 'bị từ chối kết nối';

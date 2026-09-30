@@ -4,7 +4,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HttpError, describeFailure, httpError, shortCause } from '../dist/errors.js';
+import { HttpError, describeFailure, httpError, isConfigFailure, shortCause } from '../dist/errors.js';
 
 /** Dựng lỗi kiểu Node/undici: lỗi thật nằm trong `cause`. */
 const fetchFailed = (cause) => Object.assign(new TypeError('fetch failed'), { cause });
@@ -103,4 +103,28 @@ test('shortCause: nói được nguyên nhân mà không kèm host hay cổng', 
   assert.equal(shortCause(new Error('DATABASE_URL is required')), 'thiếu hoặc sai DATABASE_URL');
   assert.equal(shortCause(new Error('chuyện gì đó chưa từng gặp')), 'lỗi kết nối');
   for (const value of [undefined, null, {}]) assert.equal(typeof shortCause(value), 'string');
+});
+
+test('shortCause: pooler Supabase trả "tenant/user ... not found" là project đã chết, không phải lỗi DNS', () => {
+  const missingTenant = Object.assign(
+    new Error('(ENOTFOUND) tenant/user postgres.abcdefghijklmnop not found'),
+    { name: 'PostgresError', code: 'ENOTFOUND' }
+  );
+  assert.equal(shortCause(missingTenant), 'project Supabase không tồn tại hoặc đã bị tạm ngưng');
+});
+
+test('isConfigFailure: chỉ bắt lỗi cấu hình, nhường lỗi mạng cho vòng retry thường', () => {
+  // Cấu hình sai: sửa .env mới khỏi, retry dày vô nghĩa.
+  const wrongPassword = Object.assign(new Error('password authentication failed for user "postgres"'), { name: 'PostgresError', code: '28P01' });
+  const missingTenant = new Error('(ENOTFOUND) tenant/user postgres.abc not found');
+  const missingDatabase = Object.assign(new Error('database "cinema" does not exist'), { name: 'PostgresError', code: '3D000' });
+  assert.equal(isConfigFailure(wrongPassword), true);
+  assert.equal(isConfigFailure(missingTenant), true);
+  assert.equal(isConfigFailure(missingDatabase), true);
+
+  // Sự cố tạm thời (Supabase free tier ngủ, mất mạng, DB chưa lên): vẫn retry.
+  assert.equal(isConfigFailure(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:55432'), { code: 'ECONNREFUSED' })), false);
+  assert.equal(isConfigFailure(Object.assign(new Error('getaddrinfo ENOTFOUND aws-0-ap-southeast-1.pooler.supabase.com'), { code: 'ENOTFOUND' })), false);
+  assert.equal(isConfigFailure(Object.assign(new Error('Connection terminated unexpectedly'), { code: 'CONNECTION_CLOSED' })), false);
+  assert.equal(isConfigFailure(undefined), false);
 });
