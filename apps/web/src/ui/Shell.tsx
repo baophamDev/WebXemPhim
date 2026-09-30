@@ -4,9 +4,10 @@
  */
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
-import { Clapperboard, Compass, Film, Library, Menu, Search, Server, Users, X } from 'lucide-react';
+import { Clapperboard, Film, Library, Menu, Search, Server, Users, X } from 'lucide-react';
 // Import thẳng từ './pickers', không qua barrel './index': Shell nằm trong barrel đó
 // nên đi đường vòng là tạo phụ thuộc quay đầu giữa hai module.
+import { DiscoverMenu } from './DiscoverMenu';
 import { ThemePicker } from './pickers';
 import { smoothScrollTo } from './smooth';
 
@@ -59,7 +60,7 @@ export function Header() {
       <NavLink to="/" end><Film />Trang chủ</NavLink>
       <NavLink to="/browse/list/phim-le"><Film />Phim lẻ</NavLink>
       <NavLink to="/browse/list/phim-bo"><Clapperboard />Phim bộ</NavLink>
-      <NavLink to="/browse/list/phim-chieu-rap"><Compass />Khám phá</NavLink>
+      <DiscoverMenu />
       <NavLink to="/people"><Users />Diễn viên</NavLink>
       <NavLink to="/library"><Library />Thư viện</NavLink>
       <button className="nav-close icon-button" onClick={() => setMenuOpen(false)} aria-label="Đóng menu"><X /></button>
