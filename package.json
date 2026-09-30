@@ -8,7 +8,11 @@
   },
   "workspaces": ["apps/web", "services/api"],
   "scripts": {
+    "predev": "node scripts/local-db.mjs start",
     "dev": "concurrently \"npm run dev --workspace services/api\" \"npm run dev --workspace apps/web\"",
+    "db:start": "node scripts/local-db.mjs start",
+    "db:stop": "node scripts/local-db.mjs stop",
+    "db:status": "node scripts/local-db.mjs status",
     "build": "npm run build --workspace services/api && npm run build --workspace apps/web",
     "start": "npm run start --workspace services/api",
     "typecheck": "npm run typecheck --workspace services/api && npm run typecheck --workspace apps/web",

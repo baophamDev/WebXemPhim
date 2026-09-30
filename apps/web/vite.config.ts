@@ -29,6 +29,12 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     allowedHosts: ['.trycloudflare.com'],
-    proxy: { '/api': 'http://localhost:4000' },
+    /**
+     * `127.0.0.1` chứ không phải `localhost`: API `listen()` trên `0.0.0.0` (IPv4).
+     * Trên Windows, `localhost` phân giải ra cả `::1` lẫn `127.0.0.1`, nên proxy có
+     * lúc thử `::1` trước, bị từ chối rồi mới thử IPv4 — log đầy
+     * `AggregateError [ECONNREFUSED]` dù API vẫn sống.
+     */
+    proxy: { '/api': 'http://127.0.0.1:4000' },
   },
 });

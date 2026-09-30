@@ -5,9 +5,23 @@ import { fold, movieSearchText, slugifyName } from './text.js';
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
 
+/**
+ * Địa chỉ local (cụm dev trong `.tools/pgdata`, hay PostgreSQL cài sẵn trên máy)
+ * không chạy TLS, nên `ssl: 'require'` sẽ chết ngay với "server does not support
+ * SSL connections". Chỉ suy ra khi `.env` không nói gì; `DATABASE_SSL` vẫn thắng.
+ */
+const localDatabase = /^postgres(ql)?:\/\/[^@]*@?(localhost|127\.0\.0\.1|\[::1\])[:/]/i.test(databaseUrl);
+const databaseSsl = process.env.DATABASE_SSL === 'false' ? false
+  : process.env.DATABASE_SSL === 'true' ? 'require'
+    : (localDatabase ? false : 'require');
+
 export const sql = postgres(databaseUrl, {
   max: Number(process.env.DATABASE_POOL_SIZE ?? 10), idle_timeout: 20, connect_timeout: 15,
-  prepare: false, ssl: process.env.DATABASE_SSL === 'false' ? false : 'require'
+  prepare: false, ssl: databaseSsl,
+  // Migration dùng `CREATE ... IF NOT EXISTS` nên lần khởi động thứ hai trở đi
+  // nhận một loạt NOTICE "already exists, skipping". Chúng đúng nhưng vô nghĩa
+  // với người đọc log; Supabase nuốt sẵn còn PostgreSQL local thì không.
+  onnotice: () => {}
 });
 
 const castAgg = (kind: 'actor' | 'director') =>
