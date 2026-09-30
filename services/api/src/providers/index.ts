@@ -1,5 +1,6 @@
 /**
- * Resolver catalog: VSMOV là nguồn chính, KKPhim thay thế khi VSMOV chết.
+ * Resolver catalog: VSMOV là nguồn chính, KKPhim thay khi VSMOV chết, NguonC
+ * bồi tập embed khi cả hai đều không có luồng phát.
  *
  * VSMOV có hai kiểu "chết": chặn IP datacenter (Railway từng bị 403) và trả
  * `link_m3u8` rỗng ở mọi tập (embed chỉ còn player giả). Nên tầng này không chỉ
@@ -10,17 +11,20 @@
  * - Danh sách/danh mục: nguồn đầu có items thì dùng luôn; rỗng hoặc lỗi thì hỏi
  *   nguồn kế tiếp. Hết nguồn mà vẫn không có gì thì ném lỗi cuối cùng để route
  *   rơi tiếp xuống DB (`homeWithFallback`, `taxonomyWithFallback`...).
- * - Chi tiết: ưu tiên bản có `link_m3u8` thật. VSMOV không có luồng phát thì tìm
- *   bản tương ứng bên KKPhim (theo slug rồi theo tên); không tìm được thì vẫn
- *   trả bản VSMOV (còn metadata + embed) thay vì mất cả trang.
+ * - Chi tiết: ưu tiên bản có `link_m3u8` thật (VSMOV rồi KKPhim, tìm bản tương
+ *   ứng theo slug rồi theo tên). Không nguồn nào có luồng phát thì hỏi NguonC —
+ *   nguồn chỉ có embed, nhưng là embed thật — và giữ metadata của nguồn chính,
+ *   chỉ thay danh sách tập. Cuối cùng vẫn không có gì thì trả bản VSMOV (còn
+ *   metadata) thay vì mất cả trang.
  */
 import { checkDetail, checkList, checkTaxonomy } from './normalize.js';
 import type { CatalogFilters, SourceDetail } from './types.js';
 import { kkphim } from './kkphim.js';
+import { nguonc } from './nguonc.js';
 import { vsmov } from './vsmov.js';
 
 /** Thứ tự ưu tiên: nguồn đầu trả lời được thì không hỏi nguồn sau. */
-const PROVIDERS = [vsmov, kkphim] as const;
+const PROVIDERS = [vsmov, kkphim, nguonc] as const;
 
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -52,6 +56,10 @@ const hasItems = (value: { items: unknown[] }) => value.items.length > 0;
 /** Một detail "phát được" là có ít nhất một tập kèm link m3u8 thật. */
 const playable = (detail: SourceDetail) =>
   detail.episodes.some((group) => group.server_data.some((entry) => entry.link_m3u8));
+
+/** Slug người dùng mở là khoá bản ghi trong DB; slug của nguồn chỉ là đường dẫn nội bộ. */
+const withSlug = (detail: SourceDetail, slug: string): SourceDetail =>
+  detail.movie.slug === slug ? detail : { ...detail, movie: { ...detail.movie, slug } };
 
 export const catalog = {
   names: PROVIDERS.map((provider) => provider.name),
@@ -122,6 +130,7 @@ export const catalog = {
     if (primary && playable(primary)) return { ...primary, source: vsmov.name };
 
     report?.('loading', kkphim.name);
+    let streams: SourceDetail | null = null;
     try {
       // Có metadata VSMOV thì tìm bản tương ứng theo slug/tên; VSMOV chết hẳn thì
       // thử thẳng slug người dùng mở (lúc này catalog cũng do KKPhim trả về).
@@ -132,19 +141,37 @@ export const catalog = {
           })
         : await kkphim.detail(slug);
       if (found) {
-        // Slug người dùng mở là khoá của bản ghi trong DB; slug KKPhim chỉ là
-        // đường dẫn nội bộ của nguồn đó, không được ghi đè khoá cũ.
-        const detail = found.movie.slug === slug ? found : { ...found, movie: { ...found.movie, slug } };
-        const checked = checkDetail(kkphim.name, detail);
-        // Bản thay thế chỉ được thắng khi có luồng phát; nếu cả hai đều không có
-        // thì giữ bản nguồn chính (metadata VSMOV thường đầy đủ hơn).
-        if (playable(checked) || !primary) return { ...checked, source: kkphim.name };
+        streams = checkDetail(kkphim.name, withSlug(found, slug));
+        // Có luồng phát thì thắng ngay; không thì để NguonC thử bồi tập embed.
+        if (playable(streams)) return { ...streams, source: kkphim.name };
       }
     } catch (error) {
       console.warn(`[catalog] ${kkphim.name} không có bản thay thế cho "${slug}": ${describe(error)}`);
     }
 
+    // Chưa nguồn nào có luồng phát: hỏi NguonC. Nguồn này chỉ có embed, nhưng là
+    // embed thật — hơn hẳn player giả mà VSMOV đang trả — nên thay danh sách tập,
+    // còn metadata thì giữ của nguồn chính (NguonC thiếu năm, điểm, tmdb).
+    report?.('loading', nguonc.name);
+    try {
+      const meta = primary ?? streams;
+      const found = meta
+        ? await nguonc.detailLike({
+            slug: meta.movie.slug, name: meta.movie.name,
+            originName: meta.movie.originName, year: meta.movie.year
+          })
+        : await nguonc.detail(slug);
+      if (found) {
+        const checked = checkDetail(nguonc.name, withSlug(found, slug));
+        if (checked.episodes.length) return { ...checked, movie: meta ? meta.movie : checked.movie, source: nguonc.name };
+        if (!meta) return { ...checked, source: nguonc.name };
+      }
+    } catch (error) {
+      console.warn(`[catalog] ${nguonc.name} không có bản thay thế cho "${slug}": ${describe(error)}`);
+    }
+
     if (primary) return { ...primary, source: vsmov.name };
+    if (streams) return { ...streams, source: kkphim.name };
     throw primaryError instanceof Error ? primaryError : new Error(`Không nguồn nào trả chi tiết phim "${slug}"`);
   }
 };

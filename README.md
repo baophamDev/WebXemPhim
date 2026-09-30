@@ -42,7 +42,7 @@ railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
 
-Nguồn catalog có hai tầng: **VSMOV là nguồn chính, KKPhim (`phimapi.com`) thay thế khi VSMOV lỗi, trả rỗng hoặc hết luồng phát** (VSMOV đang trả `link_m3u8` rỗng ở mọi tập), xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
+Nguồn catalog có ba tầng: **VSMOV là nguồn chính, KKPhim (`phimapi.com`) thay thế khi VSMOV lỗi, trả rỗng hoặc hết luồng phát, NguonC (`phim.nguonc.com`) bồi tập embed khi cả hai nguồn kia đều không có luồng phát** (VSMOV đang trả `link_m3u8` rỗng ở mọi tập), xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
 
 Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn việc kéo dữ liệu về chạy ở nền và có thanh tiến trình riêng — mục [12](#12-mở-một-phim-chưa-có-trong-db).
 
@@ -161,6 +161,7 @@ DATABASE_SSL=true
 DATABASE_POOL_SIZE=10
 VSMOV_API_URL=https://vsmov.com/api
 KKPHIM_API_URL=https://phimapi.com
+NGUONC_API_URL=https://phim.nguonc.com/api
 WEB_ORIGIN=http://localhost:5173
 HOST=0.0.0.0
 ```
@@ -174,6 +175,7 @@ Giải thích:
 | `DATABASE_POOL_SIZE` | Số connection tối đa của một API instance |
 | `VSMOV_API_URL` | Base URL của nguồn VSMOV (nguồn chính) |
 | `KKPHIM_API_URL` | Base URL của KKPhim, mặc định `https://phimapi.com` (nguồn thay thế khi VSMOV chết) |
+| `NGUONC_API_URL` | Base URL của NguonC, mặc định `https://phim.nguonc.com/api` (nguồn bồi tập embed khi hai nguồn kia không có luồng phát) |
 | `WEB_ORIGIN` | Những frontend domain được phép gọi API bằng trình duyệt |
 | `HOST` | Cho phép Railway truy cập Express server |
 
@@ -452,35 +454,37 @@ Tất cả nguồn nằm ở `services/api/src/providers/`:
 
 ```text
 types.ts      Kiểu dữ liệu chuẩn (ListPage/Taxonomy/SourceDetail) + bộ lọc
-normalize.ts  Chuẩn hoá + kiểm tra shape ở biên (zod)
+normalize.ts  Chuẩn hoá + kiểm tra shape ở biên (zod) + khớp tên giữa các nguồn
 http.ts       fetch dùng chung: timeout, cache theo TTL
 vsmov.ts      Nguồn chính (vsmov.com/api)
 kkphim.ts     Nguồn thay thế (phimapi.com — KKPhim, cùng gốc OPhim CMS)
-index.ts      Resolver: VSMOV trước, KKPhim sau, gắn `source` vào kết quả
+nguonc.ts     Nguồn bồi tập embed (phim.nguonc.com — NguonC, API OPhim kiểu mới)
+index.ts      Resolver: VSMOV trước, KKPhim sau, NguonC cuối, gắn `source` vào kết quả
 ```
 
-Vì sao có hai nguồn: VSMOV chặn IP datacenter (Railway từng bị 403) và từ 2026-09 trả `link_m3u8` rỗng ở mọi tập — embed chỉ còn player giả nên bấm vào tập là màn hình đen. KKPhim có `link_m3u8` thật và trả `Access-Control-Allow-Origin: *`.
+Vì sao có ba nguồn: VSMOV chặn IP datacenter (Railway từng bị 403) và từ 2026-09 trả `link_m3u8` rỗng ở mọi tập — embed chỉ còn player giả nên bấm vào tập là màn hình đen. KKPhim có `link_m3u8` thật và trả `Access-Control-Allow-Origin: *`. NguonC thì ngược lại: **không có m3u8 ở bất kỳ tập nào** (đã quét 20 phim), chỉ có embed thật (`embed*.streamc.xyz`), nên nó là chốt cuối bồi tập cho phim mà hai nguồn kia không phát được. Lưu ý embed `streamc.xyz` có `X-Frame-Options: SAMEORIGIN` và chặn Cloudflare với IP datacenter — đây là embed cho trình duyệt người dùng, không phải luồng để server tải hộ.
 
 ### 11.1. Cách resolver chọn nguồn
 
 Mọi method của `catalog` (`home`, `listBySlug`, `search`, `byGenre`, `byYear`, ...) đi qua `resolve()`:
 
-1. Hỏi VSMOV trước. Lỗi, trả rỗng, hoặc dữ liệu sai shape thì thử KKPhim.
-2. KKPhim cũng không có thì ném lỗi cuối cùng; route ở `server.ts` bắt lỗi đó và rơi tiếp xuống DB (`homeWithFallback`, `listWithFallback`, `searchWithFallback`, `taxonomyWithFallback`).
-3. Mọi response mang thêm `source` — nguồn **thật sự** trả lời (`vsmov`, `kkphim`, hoặc `database`):
+1. Hỏi VSMOV trước. Lỗi, trả rỗng, hoặc dữ liệu sai shape thì thử KKPhim, rồi tới NguonC.
+2. Cả ba đều không có thì ném lỗi cuối cùng; route ở `server.ts` bắt lỗi đó và rơi tiếp xuống DB (`homeWithFallback`, `listWithFallback`, `searchWithFallback`, `taxonomyWithFallback`).
+3. Mọi response mang thêm `source` — nguồn **thật sự** trả lời (`vsmov`, `kkphim`, `nguonc`, hoặc `database`):
 
 ```json
 { "items": [], "pagination": {}, "source": "kkphim" }
 ```
 
-KKPhim không có endpoint diễn viên/mã/danh sách năm — adapter trả rỗng ngay để resolver rơi xuống DB, không tốn một request 404.
+KKPhim không có endpoint diễn viên/mã/danh sách năm; NguonC không có endpoint liệt kê thể loại/quốc gia/năm — cả hai adapter trả rỗng ngay để resolver rơi xuống DB, không tốn một request 404.
 
 Riêng `detail()` đi xa hơn: nguồn được chọn phải có **ít nhất một tập kèm `link_m3u8`**. VSMOV trả về nhưng không có luồng phát thì resolver:
 
 1. Thử `/phim/:slug` bên KKPhim (một số slug trùng nhau).
 2. Không có thì tìm theo tên (`/tim-kiem`), chỉ nhận khi tên khớp hoặc năm khớp — thà thiếu nguồn phát còn hơn ghép nhầm phim.
 3. Tìm được thì dùng bản KKPhim nhưng **giữ slug người dùng mở** làm khoá bản ghi trong DB.
-4. Không tìm được thì vẫn trả bản VSMOV (còn metadata + embed) thay vì mất cả trang.
+4. KKPhim cũng không có luồng phát thì hỏi NguonC (`/film/:slug`, không khớp thì `/films/search`). NguonC chỉ trả embed, nhưng là embed thật, nên resolver **giữ metadata của nguồn chính và chỉ thay danh sách tập** — NguonC thiếu năm/điểm nên không muốn lấy metadata của nó đè lên.
+5. Cả ba đều không có thì trả bản VSMOV (còn metadata + embed) thay vì mất cả trang.
 
 ### 11.2. Thêm một nguồn
 

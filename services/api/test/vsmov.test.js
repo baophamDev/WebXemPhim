@@ -56,8 +56,8 @@ function stub(extra = {}) {
   seenUrls = [];
 }
 
-test('catalog.names: vsmov chính, kkphim dự phòng', () => {
-  assert.deepEqual(catalog.names, ['vsmov', 'kkphim']);
+test('catalog.names: vsmov chính, kkphim rồi nguonc dự phòng', () => {
+  assert.deepEqual(catalog.names, ['vsmov', 'kkphim', 'nguonc']);
 });
 
 test('home chuẩn hoá list và đóng dấu source', async () => {

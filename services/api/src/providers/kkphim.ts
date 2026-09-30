@@ -19,9 +19,8 @@
  * mọi tập), nên đây là nguồn để lớp resolver bồi vào khi VSMOV chết hoặc không
  * có luồng phát được.
  */
-import { fold } from '../text.js';
 import { getJson, queryString } from './http.js';
-import { emptyMovie, imageUrl, makePagination, names, num, str } from './normalize.js';
+import { emptyMovie, imageUrl, makePagination, names, num, sameTitle, searchKeywords, str } from './normalize.js';
 import type {
   CatalogFilters, EpisodeGroup, ListPage, MovieSummary, SourceDetail, Taxonomy
 } from './types.js';
@@ -128,27 +127,6 @@ function pick(filters: CatalogFilters, ...keys: (keyof CatalogFilters)[]): Catal
 const danhsachAt = (slug: string, filters: CatalogFilters = {}): Promise<ListPage> =>
   listAt(`/danh-sach/${encodeURIComponent(slug)}`, pick(filters, 'page'));
 
-/** Rút gọn tên để so khớp hai nguồn: bỏ dấu, bỏ hậu tố `(Phần N)`/`Part N` cuối. */
-const titleKey = (value: unknown) => fold(value).replace(/\s*\(?(phan|part)\s*\d+\)?$/i, '').trim();
-
-/** Các từ khoá nên thử khi tìm bản tương ứng, xếp từ cụ thể tới rộng. */
-function searchKeywords(wanted: { name: string; originName?: string | null }): string[] {
-  const bare = wanted.name.replace(/\s*\([^)]*\)\s*$/, '');
-  return [wanted.name, bare, str(wanted.originName)]
-    .map((value) => str(value))
-    .filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
-}
-
-/** Tên hai nguồn có khớp nhau không; lệch hậu tố thì chỉ nhận khi năm khớp. */
-function sameTitle(itemName: unknown, itemOrigin: unknown, wanted: { name: string; originName?: string | null; year?: number | null }, itemYear: unknown): boolean {
-  const wantedNames = [wanted.name, wanted.originName].map(titleKey).filter(Boolean);
-  const itemNames = [itemName, itemOrigin].map(titleKey).filter(Boolean);
-  if (itemNames.some((name) => wantedNames.includes(name))) return true;
-  // Thà không tìm được nguồn phát còn hơn ghép nhầm phim khác vào.
-  const year = num(itemYear);
-  if (!wanted.year || !year || wanted.year !== year) return false;
-  return itemNames.some((name) => wantedNames.some((want) => name.startsWith(want + ' ') || want.startsWith(name + ' ')));
-}
 export const kkphim = {
   name: SOURCE,
   latest: (page: number) => listAt('/danh-sach/phim-moi-cap-nhat', { page }),

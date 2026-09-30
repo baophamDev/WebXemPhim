@@ -10,6 +10,7 @@
  * snake_case của nguồn lẫn camelCase; trả thì luôn đúng `MovieSummary`.
  */
 import { z } from 'zod';
+import { fold } from '../text.js';
 import type { ListPage, MovieSummary, Pagination, SourceDetail, Taxonomy } from './types.js';
 
 /** Chuỗi rỗng/khoảng trắng coi như không có, để nguồn khác bồi vào được. */
@@ -38,6 +39,39 @@ export const imageUrl = (value: unknown): string | null => {
   if (!raw) return null;
   return /^https?:\/\//i.test(raw) ? raw : null;
 };
+
+/**
+ * Khớp phim giữa hai nguồn theo tên + năm.
+ *
+ * Các nguồn đặt slug khác nhau cho cùng một phim, nên khi slug không dùng được
+ * thì phải so tên. So khớp rộng tay sẽ ghép nhầm phim khác (nhất là phim có phần
+ * tiếp theo), nên: tên đã bỏ dấu khớp nhau thì nhận; chỉ khớp một phần thì bắt
+ * buộc năm phải khớp.
+ */
+export const titleKey = (value: unknown) => fold(value).replace(/\s*\(?(phan|part)\s*\d+\)?$/i, '').trim();
+
+export function sameTitle(
+  itemName: unknown,
+  itemOrigin: unknown,
+  wanted: { name: string; originName?: string | null; year?: number | null },
+  itemYear: unknown
+): boolean {
+  const wantedNames = [wanted.name, wanted.originName].map(titleKey).filter(Boolean);
+  const itemNames = [itemName, itemOrigin].map(titleKey).filter(Boolean);
+  if (itemNames.some((name) => wantedNames.includes(name))) return true;
+  // Thà không tìm được bản tương ứng còn hơn ghép nhầm phim khác vào.
+  const year = num(itemYear);
+  if (!wanted.year || !year || wanted.year !== year) return false;
+  return itemNames.some((name) => wantedNames.some((want) => name.startsWith(want + ' ') || want.startsWith(name + ' ')));
+}
+
+/** Các từ khoá nên thử khi tìm bản tương ứng, xếp từ cụ thể tới rộng. */
+export function searchKeywords(wanted: { name: string; originName?: string | null }): string[] {
+  const bare = wanted.name.replace(/\s*\([^)]*\)\s*$/, '');
+  return [wanted.name, bare, str(wanted.originName)]
+    .map((value) => str(value))
+    .filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
+}
 
 const movieSummarySchema = z.object({
   provider: z.string().min(1),
