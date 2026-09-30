@@ -1,0 +1,24 @@
+/**
+ * Vỏ Android của BảoNhànCinema — chỉ một module `app`, không thư viện ngoài.
+ *
+ * App này cố ý dùng đúng đồ của framework (WebView, Activity, AlertDialog), không
+ * kéo AndroidX hay bất kỳ dependency nào từ maven. Đổi lại vài chục dòng phải tự
+ * viết, nhưng bù lại: build không phụ thuộc mạng (ngoài chính AGP), APK nhỏ, và
+ * không có phiên bản thư viện nào âm thầm trôi theo thời gian.
+ */
+pluginManagement {
+  repositories {
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+  }
+}
+dependencyResolutionManagement {
+  repositories {
+    google()
+    mavenCentral()
+  }
+}
+
+rootProject.name = 'BaoNhanCinema'
+include ':app'

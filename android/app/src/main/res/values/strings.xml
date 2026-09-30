@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Trùng tên với bản webOS và với <title> của web, để mọi nơi gọi cùng một tên. -->
+  <string name="app_name">BảoNhànCinema</string>
+</resources>

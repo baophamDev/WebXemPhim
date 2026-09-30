@@ -1,0 +1,8 @@
+/**
+ * AGP 8.7 là bản cuối còn chạy được với đúng cặp công cụ đã tải sẵn trong
+ * `.tools/` (Gradle 8.9 + JDK 17) — lên 8.8/8.9 là Gradle đòi 8.10+ rồi 8.11+,
+ * và máy này không có sẵn hai bản đó. Đổi cặp công cụ thì đổi cả số này.
+ */
+plugins {
+  id 'com.android.application' version '8.7.3' apply false
+}

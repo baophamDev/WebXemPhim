@@ -78,6 +78,75 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  # APK Android: bản "local app" — giao diện nằm trong APK, không tải từ Vercel.
+  #
+  # Job này KHÔNG chặn deploy (hai job deploy chỉ cần `build`) và cũng không cần
+  # secret nào: bản debug tự ký bằng khoá debug sinh trên runner. Bản cài thật nên
+  # build bằng `build-apk.cmd` ở máy nhà — bản đó ký bằng khoá riêng, và hai khoá
+  # khác nhau thì Android coi là hai app: cài bản này lên bản kia phải gỡ trước.
+  #
+  # Chỉ dựng `assembleDebug` vì runner không có `android/keystore.jks` (đã gitignore
+  # — khoá ký không được nằm trong repo). APK ở đây để cài thử, không phải để phát
+  # hành.
+  apk:
+    name: Build APK (Android)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # AGP 8.7 chạy trên JDK 17; JDK 21+ của runner mặc định sẽ làm Gradle 8.9 đổ.
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cùng thứ tự ưu tiên với scripts/build-apk.mjs: biến của repo nếu có, không
+      # thì API production trên Railway. Bên trong APK không có proxy nào nên địa
+      # chỉ phải tuyệt đối.
+      - name: Build web (nhét vào APK)
+        run: npm run build --workspace apps/web
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://webxemphim-production-2d70.up.railway.app/api' }}
+
+      - name: Copy web build vào assets của APK
+        run: |
+          rm -rf android/app/src/main/assets/web
+          mkdir -p android/app/src/main/assets/web
+          cp -r apps/web/dist/. android/app/src/main/assets/web/
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # chmod vì gradlew sinh ra trên Windows (build-apk.cmd) nên bit thực thi không
+      # có trong git; trên Linux phải bật lại mới chạy được.
+      - name: Dựng APK (debug)
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaoNhanCinema-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+
   # ---------------------------------------------------------------------------
   # CD: chỉ chạy khi push vào main và job build đã pass.
   # Trước khi bật, hãy TẮT auto-deploy phía Railway/Vercel để không deploy 2 lần.

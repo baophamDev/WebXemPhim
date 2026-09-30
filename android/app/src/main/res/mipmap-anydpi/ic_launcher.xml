@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icon cho máy Android 6–7 (chưa có adaptive icon): cùng hình nhưng tự vẽ luôn
+  nền, vì đời này không có mặt nạ nào che giúp.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <path
+      android:pathData="M0,0 h108 v108 h-108 z"
+      android:fillColor="@color/ic_launcher_background" />
+  <path
+      android:pathData="M22,54 a32,32 0 1,0 64,0 a32,32 0 1,0 -64,0"
+      android:fillColor="#00000000"
+      android:strokeColor="@color/app_accent"
+      android:strokeWidth="6" />
+  <path
+      android:pathData="M44,37 L75,54 L44,71 Z"
+      android:fillColor="@color/app_accent" />
+</vector>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API tự dựng trong nhà chạy http://<ip LAN>:4000 — không có TLS và cũng không
+  thể có, vì đó là một tiến trình Node trên máy tính trong nhà. Không cho phép
+  cleartext thì WebView chặn request ngay từ tầng mạng, trước cả CORS, và triệu
+  chứng duy nhất nhìn thấy được là "API ngoại tuyến".
+
+  Đánh đổi: app chấp nhận nói chuyện với một máy chủ http bất kỳ. Với app chỉ
+  hiển thị dữ liệu phim và không có thông tin đăng nhập nào để mất, đây là mức
+  đánh đổi hợp lý — đổi lại là dùng được cả mạng nhà lẫn Internet.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="true">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

@@ -74,14 +74,15 @@ function bootScript() {
  * Chạy khối script như trình duyệt chạy nó, trả về hàng đợi nó dựng được.
  *
  * `base` để trống nghĩa là giả cảnh chưa đặt VITE_API_URL: Vite giữ nguyên chuỗi
- * `%…%` và script phải tự nhận ra rồi lùi về `/api`.
+ * `%…%` và script phải tự nhận ra rồi lùi về `/api`. `apiBase` là cảnh app Android
+ * đã chèn `window.__API_BASE__` (người dùng đổi máy chủ trong app).
  */
-function runBoot(pathname, { base = API } = {}) {
+function runBoot(pathname, { base = API, apiBase } = {}) {
   // Thay biến bằng regex **global** trên toàn bộ nguồn, y hệt hook của Vite. Thay
   // bằng chuỗi thường chỉ trúng chỗ đầu tiên, nên nếu comment nhắc tới token thì
   // `var base` không được thay và test báo hỏng ở chỗ code hoàn toàn đúng.
   const code = bootScript().replace(/%VITE_API_URL%/g, base);
-  const window = {};
+  const window = apiBase ? { __API_BASE__: apiBase } : {};
   const sent = [];
   const scope = {
     window,
@@ -159,6 +160,17 @@ test('VITE_API_URL chưa đặt: cả hai bên lùi về /api', () => {
   const { queue, sent } = runBoot('/', { base: '%VITE_API_URL%' });
   assert.equal(sent[0], '/api/catalog/home?page=1');
   assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1 } }, '/api'));
+});
+
+test('app Android đã đổi máy chủ: __API_BASE__ thắng VITE_API_URL', () => {
+  // Trong APK, người dùng đổi máy chủ API ngay trong app và vỏ Android chèn
+  // `window.__API_BASE__` vào index.html. Bỏ qua nó ở đây thì request bắn trước
+  // đi tới máy chủ đóng cứng lúc build — thường là không tới được — và trang chờ
+  // vô ích một round-trip trước khi bundle kịp hỏi lại.
+  const lan = 'http://192.168.1.20:4000/api';
+  const { queue, sent } = runBoot('/', { apiBase: lan });
+  assert.equal(sent[0], `${lan}/catalog/home?page=1`);
+  assert.ok(claim(queue, { url: '/catalog/home', params: { page: 1 } }, lan), 'phải khớp với máy chủ vừa đổi');
 });
 
 test('VITE_API_URL có dấu / lặp ở cuối vẫn khớp', () => {

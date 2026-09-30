@@ -30,6 +30,11 @@ const app = express();
  * ngoại tuyến". Nhánh `!origin` ngay dưới đã nhận mọi client không phải trình
  * duyệt (curl, app native...) nên thêm 'null' không nới thêm quyền gì đáng kể;
  * vẫn để cờ `ALLOW_NULL_ORIGIN=false` cho ai muốn tắt.
+ *
+ * App Android thì khác cả hai: nội dung nằm trong APK và được chính WebView phục
+ * vụ dưới `https://appassets.androidplatform.net` — một origin https bình thường,
+ * không phải 'null', cũng không phải `*.vercel.app`. Thiếu nó thì app cài xong
+ * mở lên chỉ thấy "API ngoại tuyến" dù API vẫn sống.
  */
 const allowedOrigins = (process.env.WEB_ORIGIN ?? 'http://localhost:5173').split(',').map((origin) => origin.trim()).filter(Boolean);
 const allowVercelPreview = process.env.ALLOW_VERCEL_PREVIEW !== 'false';
@@ -37,6 +42,10 @@ const allowNullOrigin = process.env.ALLOW_NULL_ORIGIN !== 'false';
 function isAllowedOrigin(origin: string) {
   if (allowedOrigins.includes(origin)) return true;
   if (origin === 'null') return allowNullOrigin;
+  // App Android đóng gói (bundle nằm trong APK) tự phục vụ chính nó dưới host
+  // này — không phải domain thật, chỉ WebView biết. Origin là https nên nó
+  // không đi qua nhánh 'null' ở trên, và cũng không nhánh nào khác bắt được.
+  if (origin === 'https://appassets.androidplatform.net') return true;
   if (!allowVercelPreview) return false;
   try { return new URL(origin).hostname.endsWith('.vercel.app'); } catch { return false; }
 }

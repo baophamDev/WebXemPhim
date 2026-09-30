@@ -44,7 +44,10 @@
         // Không đặt biến thì Vite để nguyên chuỗi (và cảnh báo), nên phải tự nhận
         // ra rồi lùi về '/api' — đúng cho dev, vì dev server proxy '/api' sang
         // localhost:4000.
-        var base = '%VITE_API_URL%';
+        // Vỏ Android chèn window.__API_BASE__ khi người dùng đổi máy chủ API ngay
+        // trong app (xem android/): địa chỉ đó là lựa chọn có ý thức cho đúng
+        // chiếc máy này, nên thắng giá trị đóng cứng lúc build.
+        var base = window.__API_BASE__ || '%VITE_API_URL%';
         if (!base || base.charAt(0) === '%') base = '/api';
         base = base.replace(/\/+$/, '');
 
@@ -131,7 +134,12 @@
         // Web0S (chữ số 0, không phải chữ O) là UA của LG từ webOS 3 trở lên;
         // NetCast là dòng TV LG trước 2014. window.PalmSystem là object webOS bơm
         // vào mọi app đã cài nên vẫn nhận ra được khi UA bị đổi.
-        var onTv = /Web0S|webOS|NetCast|SmartTV|SMART-TV|HbbTV/i.test(ua)
+        //
+        // CinemaTV là dấu do vỏ Android tự thêm vào UA khi chạy trên Android TV
+        // (xem android/app/src/main/java/com/localcinema/android/MainActivity.java).
+        // Cần đến nó vì `?tv=1` chỉ sống ở lần nạp đầu: đi sang trang phim rồi
+        // tải lại là query biến mất, còn UA thì không.
+        var onTv = /Web0S|webOS|NetCast|SmartTV|SMART-TV|HbbTV|CinemaTV/i.test(ua)
           || !!window.PalmSystem
           || /(^|[?&])tv=1(&|$)/.test(location.search);
         if (!onTv) return;

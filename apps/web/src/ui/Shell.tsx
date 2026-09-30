@@ -4,7 +4,7 @@
  */
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
-import { Clapperboard, Compass, Film, Library, Menu, Search, Users, X } from 'lucide-react';
+import { Clapperboard, Compass, Film, Library, Menu, Search, Server, Users, X } from 'lucide-react';
 // Import thẳng từ './pickers', không qua barrel './index': Shell nằm trong barrel đó
 // nên đi đường vòng là tạo phụ thuộc quay đầu giữa hai module.
 import { ThemePicker } from './pickers';
@@ -70,11 +70,26 @@ export function Header() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tên phim hoặc diễn viên" aria-label="Tìm phim hoặc diễn viên" />
       </form>
       <Link className="icon-button mobile-search" to="/search" aria-label="Tìm kiếm"><Search /></Link>
+      <ServerButton />
       <ThemePicker />
       <Link className="icon-button desktop-icon" to="/library" aria-label="Thư viện của tôi"><Library /></Link>
       <button className="icon-button menu-button" onClick={() => setMenuOpen(true)} aria-label="Mở menu" aria-expanded={menuOpen}><Menu /></button>
     </div>
   </header>;
+}
+
+/**
+ * Nút đổi máy chủ API — chỉ hiện khi trang đang chạy trong app Android, vì chỉ ở
+ * đó mới có cầu JavaScript để mở hộp thoại (xem android/…/MainActivity.java).
+ *
+ * Trên web thường thì máy chủ do Vercel/VITE_API_URL quyết định lúc build, không
+ * có gì để đổi; còn trong app thì người dùng có thể trỏ sang API chạy trong mạng
+ * nhà mà không phải cài lại APK.
+ */
+function ServerButton() {
+  const bridge = typeof window === 'undefined' ? undefined : window.CinemaNative;
+  if (!bridge?.openServerDialog) return null;
+  return <button className="icon-button" type="button" onClick={() => bridge.openServerDialog()} aria-label="Máy chủ API" title="Máy chủ API"><Server /></button>;
 }
 
 export function SiteFooter() {

@@ -23,3 +23,18 @@ Thumbs.db
 # Không commit vì đóng lại lúc nào cũng được từ BaoNhanCinema/.
 webos-out/
 *.ipk
+
+# Android: APK xuất ra, thư mục build của Gradle, và bản build web được chép vào
+# assets (là sản phẩm, không phải nguồn — build-apk.cmd tạo lại lúc nào cũng được).
+android-out/
+*.apk
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/assets/web/
+
+# Khoá ký APK: KHÔNG commit. Android nhận diện app bằng chữ ký, nên mất file này
+# là bản cài mới bị coi như app khác — phải gỡ app cũ rồi cài lại. Xem docs/android.md.
+android/keystore.jks
+android/keystore.properties

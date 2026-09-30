@@ -1,0 +1,63 @@
+plugins { id 'com.android.application' }
+
+/**
+ * Khoá ký APK, do `scripts/build-apk.mjs` sinh một lần rồi để cạnh
+ * `settings.gradle` (đã gitignore). Không có file này thì bản release không ký
+ * được — adb sẽ từ chối cài — nên script luôn tạo trước khi gọi Gradle.
+ */
+def keystoreFile = rootProject.file('keystore.properties')
+def keystore = new Properties()
+if (keystoreFile.exists()) keystore.load(new FileInputStream(keystoreFile))
+
+/** API mặc định nhét vào BuildConfig để màn hình "Máy chủ API" biết chỗ mà gợi ý. */
+def apiBase = (project.findProperty('apiBase') ?: '').toString()
+
+android {
+  namespace 'com.localcinema.android'
+  compileSdk 35
+
+  defaultConfig {
+    applicationId 'com.localcinema.android'
+    // 23 = Android 6: đủ cũ để phủ gần hết Android box trong nhà, đủ mới để có
+    // WebResourceResponse 6 tham số và WebView không bị chia nhỏ theo đời máy.
+    minSdk 23
+    targetSdk 35
+    versionCode 1
+    versionName '1.0.0'
+    buildConfigField 'String', 'DEFAULT_API_BASE', '"' + apiBase.replace('\\', '\\\\').replace('"', '\\"') + '"'
+  }
+
+  signingConfigs {
+    release {
+      if (keystoreFile.exists()) {
+        storeFile rootProject.file(keystore.getProperty('storeFile'))
+        storePassword keystore.getProperty('storePassword')
+        keyAlias keystore.getProperty('keyAlias')
+        keyPassword keystore.getProperty('keyPassword')
+      }
+    }
+  }
+
+  buildTypes {
+    release {
+      // Không bật R8/ProGuard: app không có code thừa nào đáng kể (một Activity),
+      // còn giữ nguyên tên lớp thì đọc stacktrace trên logcat dễ hơn nhiều.
+      minifyEnabled false
+      if (keystoreFile.exists()) signingConfig signingConfigs.release
+    }
+  }
+
+  buildFeatures { buildConfig true }
+
+  compileOptions {
+    // javac của JDK 17 vẫn lấy bảng mã mặc định của hệ điều hành; file nguồn ở
+    // đây có tiếng Việt trong cả comment lẫn chuỗi hiển thị ("Máy chủ API"), và
+    // đọc nhầm bảng mã thì app hiện ra chữ rác chứ không báo lỗi gì.
+    encoding 'UTF-8'
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+
+  // `src/main/assets/web` là bản build của apps/web, do build-apk.mjs chép vào.
+  // Không nằm trong git: nó là sản phẩm, không phải nguồn.
+}

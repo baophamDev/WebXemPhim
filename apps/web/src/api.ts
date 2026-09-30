@@ -27,7 +27,14 @@ function readDeviceId(){
   }
 }
 export const deviceId=readDeviceId();
-const apiBaseUrl=(import.meta.env.VITE_API_URL??'/api').replace(/\/$/,'');
+/**
+ * Vỏ Android chèn `window.__API_BASE__` vào index.html khi người dùng đổi máy
+ * chủ API ngay trong app (xem android/app/src/main/java/com/localcinema/android).
+ * Địa chỉ đó thắng biến môi trường: VITE_API_URL là giá trị đóng cứng lúc build,
+ * còn cái kia là lựa chọn của người dùng cho đúng chiếc máy này.
+ */
+const injectedApiBase=typeof window==='undefined'?undefined:window.__API_BASE__;
+const apiBaseUrl=(injectedApiBase||import.meta.env.VITE_API_URL||'/api').replace(/\/$/,'');
 
 /**
  * Base URL tương đối ('/api') chỉ chạy được khi có proxy cùng origin: dev server

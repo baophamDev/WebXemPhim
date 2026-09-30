@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Hai màu này lấy từ chính app: bgColor/iconColor trong bản webOS cũ, và hai
+       biến custom property của apps/web/src/styles.css. Nền tối ở đây là thứ hiện
+       ra trong lúc WebView còn chưa vẽ được khung hình đầu — để trắng thì mỗi lần
+       mở app là một nháy trắng. (Chú thích XML không được chứa hai dấu gạch liền
+       nhau, nên tên biến CSS đành viết vòng.) -->
+  <color name="app_background">#FF0B0806</color>
+  <color name="app_accent">#FFFFC53D</color>
+  <color name="ic_launcher_background">#FF0B0806</color>
+</resources>
