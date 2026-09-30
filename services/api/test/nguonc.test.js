@@ -136,6 +136,27 @@ test('byGenre/byYear: đúng đường của nguồn, chỉ gửi page', async (
   assert.equal(new URL(seenUrls.at(-1)).pathname, '/api/films/nam-phat-hanh/2024');
 });
 
+test('thể loại: nguồn động chết hết thì menu vẫn có bản chép tay của NguonC', async () => {
+  stub({ 'vsmov.com/api/the-loai': deny, 'phimapi.com/v1/api/the-loai': deny });
+  const result = await catalog.genres();
+  assert.equal(result.source, 'nguonc');
+  assert.ok(result.items.length >= 20, `phải có đủ menu thể loại, nhận ${result.items.length}`);
+  for (const slug of ['hanh-dong', 'tam-ly', 'tinh-cam', 'mien-tay']) {
+    assert.ok(result.items.some((item) => item.slug === slug), `thiếu thể loại ${slug}`);
+  }
+});
+
+test('thể loại: VSMOV sống thì menu hợp thêm thể loại chỉ NguonC mới có', async () => {
+  stub({
+    'vsmov.com/api/the-loai': { data: { items: [{ _id: '1', name: 'Hành Động', slug: 'hanh-dong' }] } }
+  });
+  const result = await catalog.genres();
+  assert.equal(result.source, 'vsmov+nguonc');
+  // Mục của nguồn động đứng trước, mục trùng slug không bị nhân đôi.
+  assert.equal(result.items[0].slug, 'hanh-dong');
+  assert.equal(result.items.filter((item) => item.slug === 'hanh-dong').length, 1);
+  assert.ok(result.items.some((item) => item.slug === 'tam-ly'));
+});
 test('search: gửi keyword + page', async () => {
   stub({
     'vsmov.com/api/tim-kiem': deny,

@@ -142,6 +142,26 @@ function normalizeEpisodes(payload: any): EpisodeGroup[] {
 const listAt = async (path: string, filters: CatalogFilters = {}, extra: Record<string, unknown> = {}): Promise<ListPage> =>
   normalizeList(await request(`${path}${queryString({ page: filters.page, ...extra })}`), filters.limit ?? 24);
 
+/**
+ * Thể loại của NguonC, chép từ menu của phim.nguonc.com (đối chiếu 2026-09; mọi
+ * slug ở đây đã thử `/films/the-loai/:slug` và đều trả phim).
+ *
+ * Vì sao chép tay: nguồn **không có endpoint liệt kê thể loại** — trang chủ tự
+ * viết cứng danh sách này trong HTML. `catalog.genres()` hợp nó vào menu của web,
+ * nên thể loại chỉ có ở NguonC (Tâm Lý, Tình Cảm, Miền Tây...) vẫn bấm được:
+ * `byGenre` rơi xuống đúng nguồn có nó.
+ */
+export const nguoncGenres: Taxonomy['items'] = [
+  ['hanh-dong', 'Hành Động'], ['tinh-cam', 'Tình Cảm'], ['chinh-kich', 'Chính Kịch'],
+  ['tam-ly', 'Tâm Lý'], ['kinh-di', 'Kinh Dị'], ['bi-an', 'Bí Ẩn'],
+  ['hinh-su', 'Hình Sự'], ['gay-can', 'Gây Cấn'], ['phieu-luu', 'Phiêu Lưu'],
+  ['co-trang', 'Cổ Trang'], ['lich-su', 'Lịch Sử'], ['chien-tranh', 'Chiến Tranh'],
+  ['khoa-hoc-vien-tuong', 'Khoa Học Viễn Tưởng'], ['gia-tuong', 'Giả Tưởng'], ['phim-hai', 'Hài'],
+  ['hoat-hinh', 'Hoạt Hình'], ['gia-dinh', 'Gia Đình'], ['phim-nhac', 'Nhạc'],
+  ['tai-lieu', 'Tài Liệu'], ['lang-man', 'Lãng Mạn'], ['mien-tay', 'Miền Tây'],
+  ['phim-18', 'Phim 18+']
+].map(([slug, name]) => ({ id: slug, name, slug, thumbUrl: null }));
+
 export const nguonc = {
   name: SOURCE,
   latest: (page: number) => listAt('/films/phim-moi-cap-nhat', { page }),
@@ -151,8 +171,9 @@ export const nguonc = {
   list: (slug: string, filters: CatalogFilters = {}) =>
     listAt(slug === 'phim-moi-cap-nhat' ? '/films/phim-moi-cap-nhat' : `/films/danh-sach/${encodeURIComponent(slug)}`, filters),
   search: (keyword: string, filters: CatalogFilters = {}) => listAt('/films/search', filters, { keyword }),
-  // Không có endpoint liệt kê danh mục — trả rỗng để resolver rơi xuống DB.
-  genres: async (): Promise<Taxonomy> => ({ items: [] }),
+  // Không có endpoint liệt kê thể loại — trả bản chép tay; `catalog.genres()` hợp
+  // danh sách này vào menu bất kể nguồn nào khác trả lời được hay không.
+  genres: async (): Promise<Taxonomy> => ({ items: nguoncGenres }),
   byGenre: (slug: string, filters: CatalogFilters = {}) => listAt(`/films/the-loai/${encodeURIComponent(slug)}`, filters),
   countries: async (): Promise<Taxonomy> => ({ items: [] }),
   byCountry: (slug: string, filters: CatalogFilters = {}) => listAt(`/films/quoc-gia/${encodeURIComponent(slug)}`, filters),

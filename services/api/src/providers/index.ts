@@ -18,9 +18,9 @@
  *   metadata) thay vì mất cả trang.
  */
 import { checkDetail, checkList, checkTaxonomy } from './normalize.js';
-import type { CatalogFilters, SourceDetail } from './types.js';
+import type { CatalogFilters, SourceDetail, Taxonomy, TaxonomyItem } from './types.js';
 import { kkphim } from './kkphim.js';
-import { nguonc } from './nguonc.js';
+import { nguonc, nguoncGenres } from './nguonc.js';
 import { vsmov } from './vsmov.js';
 
 /** Thứ tự ưu tiên: nguồn đầu trả lời được thì không hỏi nguồn sau. */
@@ -53,6 +53,12 @@ async function resolve<T>(
 
 const hasItems = (value: { items: unknown[] }) => value.items.length > 0;
 
+/** Hợp hai danh mục theo `slug`, giữ mục của bên đứng trước — dùng cho menu thể loại. */
+function mergeTaxonomy(first: TaxonomyItem[], second: TaxonomyItem[]): TaxonomyItem[] {
+  const seen = new Set(first.map((item) => item.slug));
+  return [...first, ...second.filter((item) => !seen.has(item.slug))];
+}
+
 /** Một detail "phát được" là có ít nhất một tập kèm link m3u8 thật. */
 const playable = (detail: SourceDetail) =>
   detail.episodes.some((group) => group.server_data.some((entry) => entry.link_m3u8));
@@ -80,8 +86,26 @@ export const catalog = {
     return { ...checkList(source, value), source };
   },
   genres: async () => {
-    const { value, source } = await resolve('thể loại', (provider) => provider.genres(), hasItems);
-    return { ...checkTaxonomy(source, value), source };
+    // Menu thể loại là **hợp** của nguồn động trả lời được với bản chép tay của
+    // NguonC — nguồn đó không có endpoint liệt kê, nhưng có thể loại mà VSMOV
+    // không có (Tâm Lý, Tình Cảm, Miền Tây...). Bấm mục chỉ NguonC có thì
+    // `byGenre` tự rơi xuống nguồn có nó (VSMOV trả rỗng → KKPhim → NguonC), còn
+    // nguồn động chết hết thì menu vẫn còn danh sách tĩnh, không trắng.
+    let base: Taxonomy = { items: [] };
+    let source: string = nguonc.name;
+    try {
+      const answered = await resolve('thể loại', (provider) => provider.genres(), hasItems);
+      base = answered.value;
+      source = answered.source;
+    } catch (error) {
+      console.warn(`[catalog] không nguồn động nào trả thể loại, dùng bản tĩnh của ${nguonc.name}: ${describe(error)}`);
+    }
+    const items = mergeTaxonomy(base.items, nguoncGenres);
+    if (!items.length) throw new Error('Không nguồn nào trả thể loại');
+    return {
+      ...checkTaxonomy(source, { items }),
+      source: items.length > base.items.length && !source.includes(nguonc.name) ? `${source}+${nguonc.name}` : source
+    };
   },
   byGenre: async (slug: string, filters: CatalogFilters = {}) => {
     const { value, source } = await resolve(`phim theo thể loại "${slug}"`, (provider) => provider.byGenre(slug, filters), hasItems);

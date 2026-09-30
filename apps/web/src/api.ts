@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { bootUrl, claimBoot } from './boot';
 import { apiUnavailable, catalogTarget } from './catalogFallback';
+import { nguoncTarget } from './nguonc';
 import { vsmovTarget } from './vsmov';
 import type { CatalogQuery, Episode, ImportJob, Movie, MovieList, Navigation, Person, PersonList, SubtitleFile, SubtitleSearch, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
@@ -45,8 +46,8 @@ const apiBaseUrl=(injectedApiBase||import.meta.env.VITE_API_URL||'/api').replace
  */
 export const apiBaseIsRelative=!/^https?:\/\//i.test(apiBaseUrl);
 /**
- * URL của endpoint ingest (web tự kéo phim từ vsmov rồi gửi về đây). Tách riêng
- * vì `useVsmov` cần nó mà không được import cả cinemaApi vào module đó.
+ * URL của endpoint ingest (web tự kéo phim từ NguonC rồi gửi về đây). Tách riêng
+ * vì `useNguonc` cần nó mà không được import cả cinemaApi vào module đó.
  */
 export const apiIngestUrl=`${apiBaseUrl}/ingest/movies`;
 export function apiOfflineHint(){
@@ -112,12 +113,19 @@ export interface MovieResponse{movie:Movie|null;importing?:ImportJob|null}
  * và bảng route.
  *
  * Đây là nhánh cứu, không phải nhánh chính: API trả lời được thì không ai gọi
- * tới đây. Nguồn cũng lỗi thì trả `null` để lỗi cũ đi tiếp — người dùng nhận
- * đúng câu "không tải được dữ liệu" thay vì một lỗi khác khó hiểu hơn.
+ * tới đây. NguonC đứng trước vì đó là nguồn có luồng thật (embed *.streamc.xyz)
+ * và cùng nguồn đó có thể loại để dựng menu; VSMOV là chặng cuối cho những gì
+ * NguonC không có (quốc gia, năm, phim lạ) — chấp nhận nó chỉ còn phần chữ dùng được.
+ *
+ * Nguồn cũng lỗi thì trả `null` để lỗi cũ đi tiếp — người dùng nhận đúng câu
+ * "không tải được dữ liệu" thay vì một lỗi khác khó hiểu hơn.
  */
-async function fromVsmov(args:string|FetchArgs):Promise<unknown|null>{
+async function fromSources(args:string|FetchArgs):Promise<unknown|null>{
   const target=catalogTarget(args);
   if(!target)return null;
+  try{
+    return await nguoncTarget(target);
+  }catch{ /* nguồn này không có thì thử chặng cuối */ }
   try{
     return await vsmovTarget(target);
   }catch{
@@ -129,7 +137,7 @@ const baseQuery:BaseQueryFn<string|FetchArgs,unknown,FetchBaseQueryError>=async(
   const result=(await fromBoot(args))??(await rawBaseQuery(args,api,extra));
   const failure='error' in result?result.error:undefined;
   if(failure&&apiUnavailable(failure.status)){
-    const data=await fromVsmov(args);
+    const data=await fromSources(args);
     if(data!==null)return {data};
   }
   return result;

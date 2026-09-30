@@ -42,7 +42,7 @@ railway.json              Cấu hình deploy Railway
 vercel.json               Cấu hình deploy Vercel
 ```
 
-Nguồn catalog có ba tầng: **VSMOV là nguồn chính, KKPhim (`phimapi.com`) thay thế khi VSMOV lỗi, trả rỗng hoặc hết luồng phát, NguonC (`phim.nguonc.com`) bồi tập embed khi cả hai nguồn kia đều không có luồng phát** (VSMOV đang trả `link_m3u8` rỗng ở mọi tập), xem mục [11](#11-tầng-nguồn-catalog). Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
+Nguồn catalog có ba tầng: **VSMOV là nguồn chính, KKPhim (`phimapi.com`) thay thế khi VSMOV lỗi, trả rỗng hoặc hết luồng phát, NguonC (`phim.nguonc.com`) bồi tập embed khi cả hai nguồn kia đều không có luồng phát** (VSMOV đang trả `link_m3u8` rỗng ở mọi tập), xem mục [11](#11-tầng-nguồn-catalog). Menu thể loại là **hợp** của các nguồn, nên thể loại chỉ có ở NguonC (Tâm Lý, Tình Cảm, Miền Tây...) vẫn hiện và bấm được. Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
 
 Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn việc kéo dữ liệu về chạy ở nền và có thanh tiến trình riêng — mục [12](#12-mở-một-phim-chưa-có-trong-db).
 
@@ -458,11 +458,13 @@ normalize.ts  Chuẩn hoá + kiểm tra shape ở biên (zod) + khớp tên gi�
 http.ts       fetch dùng chung: timeout, cache theo TTL
 vsmov.ts      Nguồn chính (vsmov.com/api)
 kkphim.ts     Nguồn thay thế (phimapi.com — KKPhim, cùng gốc OPhim CMS)
-nguonc.ts     Nguồn bồi tập embed (phim.nguonc.com — NguonC, API OPhim kiểu mới)
+nguonc.ts     Nguồn bồi tập embed + menu thể loại (phim.nguonc.com — NguonC, API OPhim kiểu mới)
 index.ts      Resolver: VSMOV trước, KKPhim sau, NguonC cuối, gắn `source` vào kết quả
 ```
 
 Vì sao có ba nguồn: VSMOV chặn IP datacenter (Railway từng bị 403) và từ 2026-09 trả `link_m3u8` rỗng ở mọi tập — embed chỉ còn player giả nên bấm vào tập là màn hình đen. KKPhim có `link_m3u8` thật và trả `Access-Control-Allow-Origin: *`. NguonC thì ngược lại: **không có m3u8 ở bất kỳ tập nào** (đã quét 20 phim), chỉ có embed thật (`embed*.streamc.xyz`), nên nó là chốt cuối bồi tập cho phim mà hai nguồn kia không phát được. Lưu ý embed `streamc.xyz` có `X-Frame-Options: SAMEORIGIN` và chặn Cloudflare với IP datacenter — đây là embed cho trình duyệt người dùng, không phải luồng để server tải hộ.
+
+Menu thể loại không lấy nguyên của một nguồn: `catalog.genres()` hỏi như mọi danh mục rồi **hợp thêm bản chép tay `nguoncGenres`** (NguonC không có endpoint liệt kê — trang chủ của nó viết cứng danh sách trong HTML). Nhờ vậy menu có cả thể loại chỉ NguonC có, và không trắng khi mọi nguồn động cùng chết.
 
 ### 11.1. Cách resolver chọn nguồn
 
@@ -476,7 +478,7 @@ Mọi method của `catalog` (`home`, `listBySlug`, `search`, `byGenre`, `byYear
 { "items": [], "pagination": {}, "source": "kkphim" }
 ```
 
-KKPhim không có endpoint diễn viên/mã/danh sách năm; NguonC không có endpoint liệt kê thể loại/quốc gia/năm — cả hai adapter trả rỗng ngay để resolver rơi xuống DB, không tốn một request 404.
+KKPhim không có endpoint diễn viên/mã/danh sách năm; NguonC không có endpoint liệt kê thể loại/quốc gia/năm — cả hai adapter trả rỗng ngay để resolver rơi xuống DB, không tốn một request 404. Riêng thể loại thì NguonC có bản chép tay (`nguoncGenres`) và được hợp vào menu, nên không rơi mất.
 
 Riêng `detail()` đi xa hơn: nguồn được chọn phải có **ít nhất một tập kèm `link_m3u8`**. VSMOV trả về nhưng không có luồng phát thì resolver:
 
@@ -485,6 +487,8 @@ Riêng `detail()` đi xa hơn: nguồn được chọn phải có **ít nhất m
 3. Tìm được thì dùng bản KKPhim nhưng **giữ slug người dùng mở** làm khoá bản ghi trong DB.
 4. KKPhim cũng không có luồng phát thì hỏi NguonC (`/film/:slug`, không khớp thì `/films/search`). NguonC chỉ trả embed, nhưng là embed thật, nên resolver **giữ metadata của nguồn chính và chỉ thay danh sách tập** — NguonC thiếu năm/điểm nên không muốn lấy metadata của nó đè lên.
 5. Cả ba đều không có thì trả bản VSMOV (còn metadata + embed) thay vì mất cả trang.
+
+Ngoài ra `respondWithMovie()` trong `server.ts` **tự chữa bản ghi cũ**: phim đã lưu mà không tập nào có `m3u8` (dấu hiệu của bản nhập từ VSMOV trước đây) thì mở một job nhập lại ở nền, chặn theo giờ để phim mà không nguồn nào có luồng thật không bị nhập mãi. Mở lại trang là bản mới đã nằm trong kho.
 
 ### 11.2. Thêm một nguồn
 
@@ -586,7 +590,9 @@ Edge của Railway trả đúng câu này khi **không còn service nào đứng
 
 ### Web vẫn xem được phim khi API chết
 
-Catalog không phụ thuộc hoàn toàn vào API: nguồn vsmov trả `Access-Control-Allow-Origin: *` nên **trình duyệt** gọi thẳng được, và [apps/web/src/catalogFallback.ts](apps/web/src/catalogFallback.ts) dịch route catalog của API sang request tương ứng của nguồn khi API không trả lời (lỗi mạng, 404, 5xx, hoặc rewrite trả HTML). Nhờ vậy trang chủ, khám phá, menu, chi tiết phim và trang xem vẫn dựng được.
+Catalog không phụ thuộc hoàn toàn vào API: các nguồn trả `Access-Control-Allow-Origin: *` nên **trình duyệt** gọi thẳng được, và [apps/web/src/catalogFallback.ts](apps/web/src/catalogFallback.ts) dịch route catalog của API sang request tương ứng của nguồn khi API không trả lời (lỗi mạng, 404, 5xx, hoặc rewrite trả HTML). Nhờ vậy trang chủ, khám phá, menu, chi tiết phim và trang xem vẫn dựng được.
+
+Thứ tự ở nhánh này là **NguonC trước, VSMOV sau** ([apps/web/src/nguonc.ts](apps/web/src/nguonc.ts)): NguonC có embed thật nên bấm xem là phát, còn VSMOV chỉ dùng được phần chữ (m3u8 rỗng, embed 522). Trang chi tiết và ô tìm kiếm cũng gọi thẳng NguonC ([apps/web/src/useNguonc.ts](apps/web/src/useNguonc.ts)) khi phim chưa có trong kho, hoặc khi bản trong kho vẫn còn tập giả của VSMOV.
 
 Dải "API ngoại tuyến" ở trang chủ chỉ để nói rằng những thứ thuộc *kho* đang không chạy: Lưu phim, Xem tiếp, tìm trong DB, phụ đề, và job nhập phim ở nền. Muốn có lại thì API phải sống (xem mục trên).
 ### Trình duyệt báo lỗi CORS

@@ -1,24 +1,26 @@
 /**
- * Hook gọi thẳng VSMOV từ trình duyệt (xem `src/vsmov.ts` vì sao đường này tồn tại).
+ * Hook gọi thẳng NguonC từ trình duyệt (xem `src/nguonc.ts` vì sao đường này tồn
+ * tại và vì sao nó thay VSMOV ở đây).
  *
- * Không đưa vào RTK Query: baseQuery của cinemaApi aimed vào API của mình (kèm
- * cơ chế claimBoot), còn đây là nguồn ngoài hoàn toàn — tách hook riêng bằng
+ * Không đưa vào RTK Query: baseQuery của cinemaApi nhắm vào API của mình (kèm cơ
+ * chế claimBoot), còn đây là nguồn ngoài hoàn toàn — tách hook riêng bằng
  * useState/useEffect cho hai chữ ký không lẫn vào nhau.
  */
 import { useEffect, useRef, useState } from 'react';
 import { apiIngestUrl } from './api';
-import { vsmovDetail, vsmovSearch, type IngestPayload } from './vsmov';
+import { nguoncDetail, nguoncSearch } from './nguonc';
+import type { IngestPayload } from './vsmov';
 import type { MovieList } from './types';
 
-export interface VsmovQuery<T> {
+export interface NguoncQuery<T> {
   data: T | null;
   error: string | null;
   isFetching: boolean;
 }
 
 /** Số request đã bắn — chỉ nhận kết quả của request mới nhất (bỏ kết quả về trễ). */
-export function useVsmovSearch(keyword: string, page: number, limit = 24, enabled = true): VsmovQuery<MovieList> {
-  const [state, setState] = useState<VsmovQuery<MovieList>>({ data: null, error: null, isFetching: false });
+export function useNguoncSearch(keyword: string, page: number, limit = 24, enabled = true): NguoncQuery<MovieList> {
+  const [state, setState] = useState<NguoncQuery<MovieList>>({ data: null, error: null, isFetching: false });
   const token = useRef(0);
   useEffect(() => {
     if (!enabled || keyword.trim().length < 2) {
@@ -27,7 +29,7 @@ export function useVsmovSearch(keyword: string, page: number, limit = 24, enable
     }
     const mine = ++token.current;
     setState((prev) => ({ ...prev, isFetching: true }));
-    vsmovSearch(keyword.trim(), page, limit)
+    nguoncSearch(keyword.trim(), page, limit)
       .then((data) => { if (token.current === mine) setState({ data, error: null, isFetching: false }); })
       .catch((error: Error) => { if (token.current === mine) setState({ data: null, error: error.message, isFetching: false }); });
   }, [keyword, page, limit, enabled]);
@@ -35,12 +37,14 @@ export function useVsmovSearch(keyword: string, page: number, limit = 24, enable
 }
 
 /**
- * Chi tiết một phim từ vsmov, kèm việc tự gửi về API (`ingest`) khi lấy được.
- * Ingest lỗi thì im lặng: việc xem không được chặn vì kho không ghi được — lần
- * tới nó sẽ thử lại.
+ * Chi tiết một phim từ NguonC.
+ *
+ * `ingest` chỉ bật khi phim **chưa có trong kho**: gửi bản NguonC về để lần sau mở
+ * là có ngay. Phim đã có trong kho thì để job nhập ở nền của API lo (nó ưu tiên
+ * m3u8 thật của KKPhim), client gửi đè lên là tranh nhau ghi.
  */
-export function useVsmovDetail(slug: string, enabled: boolean): VsmovQuery<IngestPayload> & { ingested: boolean } {
-  const [state, setState] = useState<VsmovQuery<IngestPayload>>({ data: null, error: null, isFetching: false });
+export function useNguoncDetail(slug: string, enabled: boolean, ingest = true): NguoncQuery<IngestPayload> & { ingested: boolean } {
+  const [state, setState] = useState<NguoncQuery<IngestPayload>>({ data: null, error: null, isFetching: false });
   const [ingested, setIngested] = useState(false);
   const token = useRef(0);
   useEffect(() => {
@@ -51,10 +55,11 @@ export function useVsmovDetail(slug: string, enabled: boolean): VsmovQuery<Inges
     }
     const mine = ++token.current;
     setState((prev) => ({ ...prev, isFetching: true }));
-    vsmovDetail(slug)
+    nguoncDetail(slug)
       .then(async (data) => {
         if (token.current !== mine) return;
         setState({ data, error: null, isFetching: false });
+        if (!ingest) return;
         try {
           const response = await fetch(apiIngestUrl, {
             method: 'POST',
@@ -65,6 +70,6 @@ export function useVsmovDetail(slug: string, enabled: boolean): VsmovQuery<Inges
         } catch { /* kho không ghi được: vẫn xem được, thử lại lần sau */ }
       })
       .catch((error: Error) => { if (token.current === mine) setState({ data: null, error: error.message, isFetching: false }); });
-  }, [slug, enabled]);
+  }, [slug, enabled, ingest]);
   return { ...state, ingested };
 }

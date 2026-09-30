@@ -100,9 +100,33 @@ function queueImport(slug: string): ImportJob {
  * biết poll. Job đổ thì ném lại lỗi gốc (404 khác 502) và bỏ job đi, để lần thử
  * lại là một lần nhập thật chứ không phải phát lại lỗi cũ.
  */
+/**
+ * Bản ghi cũ có thể mang tập "giả" của VSMOV: `link_m3u8` rỗng, embed trỏ
+ * `s2.streamvsmov.com` (đã 522 và tự chặn iframe). Người xem bấm vào là màn hình
+ * đen mà không hiểu vì sao, và mở lại cũng thế vì tập nằm trong DB.
+ *
+ * Không sửa ngay trong request này được — kéo nguồn mất vài giây, mà trang chi
+ * tiết phải trả lời nhanh — nên mở job nhập ở nền: lần đọc sau đã có luồng thật
+ * (m3u8 của KKPhim, hoặc embed NguonC). Chặn theo giờ để phim mà **không nguồn
+ * nào** có luồng thật (nhập xong vẫn không m3u8) không bị nhập lại mãi.
+ */
+const healAt = new Map<string, number>();
+const HEAL_COOLDOWN_MS = 6 * 60 * 60_000;
+function healUnplayable(slug: string, movie: { episodes?: { m3u8Url: string | null }[] }) {
+  if ((movie.episodes ?? []).some((episode) => episode.m3u8Url)) return;
+  const last = healAt.get(slug) ?? 0;
+  if (Date.now() - last < HEAL_COOLDOWN_MS) return;
+  if (healAt.size > 5_000) for (const [key, at] of healAt) if (Date.now() - at > HEAL_COOLDOWN_MS) healAt.delete(key);
+  healAt.set(slug, Date.now());
+  queueImport(slug);
+}
+
 async function respondWithMovie(req: express.Request, res: express.Response, slug: string) {
   const saved = await getMovie(slug, true);
-  if (saved) return res.json({ movie: saved });
+  if (saved) {
+    healUnplayable(slug, saved);
+    return res.json({ movie: saved });
+  }
 
   const wait = req.query.wait === '1' || req.query.wait === 'true';
   const job = queueImport(slug);

@@ -1,15 +1,17 @@
 /**
- * Gọi thẳng VSMOV từ trình duyệt.
+ * Gọi thẳng VSMOV từ trình duyệt — giờ là **chặng cuối** của đường dự phòng.
  *
- * VSMOV chặn 403 các IP datacenter (server API trên Railway) nhưng cho IP nhà,
- * và nguồn trả `Access-Control-Allow-Origin: *` nên browser gọi được luôn. Đây
- * là đường lấy dữ liệu chính cho tìm kiếm và trang chi tiết; kho DB của API
- * được lấp bằng `ingest` sau mỗi lần browser kéo được một phim.
+ * VSMOV vẫn là nguồn duy nhất có menu quốc gia/năm, và catalog của nó rộng hơn,
+ * nên nó vẫn có ích cho phần *chữ*. Nhưng đừng lấy tập phát từ đây: `link_m3u8`
+ * rỗng ở mọi tập và embed (s2.streamvsmov.com) đã 522 + chặn iframe. Vì vậy
+ * `nguonc.ts` mới là nguồn đứng trước cho danh sách/tìm kiếm/chi tiết; file này
+ * chỉ trả lời những gì NguonC không có (`nguoncTarget` ném lỗi thì `api.ts` rơi
+ * tiếp xuống đây) và cấp thể loại nước ngoài cho menu.
  *
- * Cũng chính vì nguồn gọi được từ trình duyệt mà khi **API** chết (service bị
- * xoá, hết credit, Vercel không proxy `/api`), catalog vẫn còn đường sống:
- * `vsmovList`/`vsmovTaxonomy`/`vsmovTarget` trả về đúng shape mà API mình trả,
- * để `api.ts` (qua `catalogFallback.ts`) nhặt lại mà không chỗ gọi nào biết.
+ * Nguồn trả `Access-Control-Allow-Origin: *` nên khi **API** chết (service bị
+ * xoá, hết credit, Vercel không proxy `/api`), browser vẫn gọi được: các hàm ở
+ * đây trả về đúng shape mà API mình trả, để `api.ts` (qua `catalogFallback.ts`)
+ * nhặt lại mà không chỗ gọi nào biết.
  */
 import type { CatalogTarget } from './catalogFallback';
 import type { Episode, Movie, MovieList, TaxonomyItem, TaxonomyList } from './types';

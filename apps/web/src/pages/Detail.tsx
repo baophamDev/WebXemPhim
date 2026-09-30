@@ -2,8 +2,8 @@ import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { Heart, Play, RefreshCw, Users } from 'lucide-react';
 import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFavoriteMutation } from '../api';
-import { episodesFromVsmov } from '../vsmov';
-import { useVsmovDetail } from '../useVsmov';
+import { episodesFromNguonc } from '../nguoncMap';
+import { useNguoncDetail } from '../useNguonc';
 import { preloadPlayer } from '../chunks';
 import { previewFromState, recallMovie, rememberMovie } from '../preview';
 import type { CastMember, Episode, Movie } from '../types';
@@ -85,20 +85,31 @@ export default function Detail() {
   const result = useGetMovieQuery(slug);
   const fetched = result.data?.movie ?? null;
   /**
-   * API trả 202 (`movie: null` kèm `importing`) khi phim chưa có trong kho. Server
-   * không gọi được vsmov (IP bị chặn) nên job đó sẽ đổ — trình duyệt tự kéo detail
-   * từ vsmov (IP nhà không bị chặn) và gửi về kho qua ingest. Lấy được là có
-   * đầy đủ phim + tập để xem ngay, không chờ đợi ai.
+   * Bản trong kho vẫn có thể là bản cũ: VSMOV trả `link_m3u8` rỗng và embed
+   * `s2.streamvsmov.com` đã 522 + chặn iframe, nên phim nhập từ trước bấm vào là
+   * màn hình đen. Chừng nào còn bản như vậy thì hỏi thẳng NguonC lấy tập thật —
+   * server cũng đang nhập lại ở nền, nhưng người xem không phải chờ nó.
+   */
+  const stale = Boolean(fetched && fetched.provider === 'vsmov' && !fetched.episodes?.some((episode) => episode.m3u8Url));
+  /**
+   * API trả 202 (`movie: null` kèm `importing`) khi phim chưa có trong kho.
+   * Job nhập ở nền chạy song song; trình duyệt tự kéo detail từ NguonC để có đủ
+   * phim + tập xem ngay. Bản kéo thẳng đó chỉ gửi về kho khi phim **chưa** có bản
+   * nào — phim đã có thì để job của API lo, tránh hai bên tranh nhau ghi.
    */
   const active = Boolean(result.data && !fetched);
   const progress = useImportProgress(slug, active);
-  const direct = useVsmovDetail(slug, !fetched);
+  const direct = useNguoncDetail(slug, !fetched || stale, !fetched);
   /**
    * Bản mô tả của thẻ phim vừa bấm — có poster, tên, năm, điểm. Đủ để vẽ nửa trên
    * của trang ngay khi điều hướng, trong lúc API còn đang kéo danh sách tập về.
    */
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
-  const movie: Movie | null = fetched ?? (direct.data ? ({ ...direct.data.movie, episodes: episodesFromVsmov(direct.data.episodes) } as Movie) : null) ?? preview;
+  const directEpisodes = direct.data ? episodesFromNguonc(direct.data.episodes) : null;
+  const movie: Movie | null =
+    (fetched && directEpisodes?.length ? { ...fetched, episodes: directEpisodes } : fetched)
+    ?? (direct.data ? ({ ...direct.data.movie, episodes: directEpisodes ?? [] } as Movie) : null)
+    ?? preview;
   const failed = result.isError || Boolean(progress.failure);
   /** Chỉ kho mới có id thật: lưu phim và làm mới nguồn đều cần id đó. */
   const inStore = Boolean(fetched && fetched.id > 0);
@@ -123,7 +134,7 @@ export default function Detail() {
   const cast = movie.cast ?? [];
   const actors = cast.filter((member) => member.kind === 'actor');
   const first = movie.episodes?.[0];
-  /** Chưa có bản trong kho: nguồn phát đến từ vsmov trực tiếp hoặc đang tải. */
+  /** Chưa có bản trong kho: nguồn phát đến từ NguonC trực tiếp hoặc đang tải. */
   const loading = !fetched && !direct.data;
 
   return <Shell flush>

@@ -1,11 +1,13 @@
 /**
- * Dịch route catalog của API mình sang request tương ứng của VSMOV.
+ * Dịch route catalog của API mình sang request tương ứng của **nguồn ngoài**:
+ * `nguonc.ts` chạy trước, `vsmov.ts` là chặng cuối (xem `api.ts`).
  *
  * Vì sao có file này: API là một chặng nữa có thể chết — service bị xoá, hết credit,
- * hay IP datacenter bị VSMOV chặn 403 (chuyện đã xảy ra với Railway). Nhưng VSMOV
- * trả `Access-Control-Allow-Origin: *` nên **trình duyệt** gọi thẳng được, lúc đó
- * trang chủ, danh sách, thể loại/quốc gia/năm và menu vẫn dựng được — chỉ những gì
- * thuộc về *kho* (lưu phim, xem tiếp, phụ đề, tìm trong DB) mới thật sự cần API.
+ * hay IP datacenter bị nguồn chặn 403 (chuyện đã xảy ra với Railway). Nhưng các
+ * nguồn trả `Access-Control-Allow-Origin: *` nên **trình duyệt** gọi thẳng được,
+ * lúc đó trang chủ, danh sách, thể loại/quốc gia/năm và menu vẫn dựng được — chỉ
+ * những gì thuộc về *kho* (lưu phim, xem tiếp, phụ đề, tìm trong DB) mới thật sự
+ * cần API.
  *
  * Hàm ở đây thuần và **không import gì**: nhận URL của request rồi trả về việc phải
  * làm, để test biên dịch được một file duy nhất (test/catalogFallback.test.mjs) và
