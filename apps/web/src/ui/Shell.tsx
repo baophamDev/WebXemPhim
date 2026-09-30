@@ -97,7 +97,7 @@ export function SiteFooter() {
   return <footer>
     <Logo />
     <p>© {new Date().getFullYear()} BảoNhànCinema · Rạp phim riêng của gia đình</p>
-    <div><Link to="/local">Kho đã lưu</Link><Link to="/people">Diễn viên</Link><Link to="/showtimes">Lịch phát hành</Link></div>
+    <div><Link to="/local">Kho đã lưu</Link><Link to="/people">Diễn viên</Link></div>
   </footer>;
 }
 

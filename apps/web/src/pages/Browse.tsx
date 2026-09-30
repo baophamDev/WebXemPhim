@@ -97,7 +97,7 @@ function FilterBar({ applied, onApply }: { applied: Filters; onApply: (draft: Fi
 
 export default function Browse() {
   const { kind = 'list', value = 'phim-moi-cap-nhat' } = useParams();
-  const safeKind = (['list', 'genre', 'country', 'year', 'code'].includes(kind) ? kind : 'list') as CatalogKind;
+  const safeKind = (['list', 'genre', 'country', 'year'].includes(kind) ? kind : 'list') as CatalogKind;
   const { page, applied, goToPage, apply } = useCatalogParams(safeKind, value);
   const query: CatalogQuery = { kind: safeKind, value, page, limit: 24 };
   for (const key of FILTER_KEYS) if (applied[key]) query[key] = applied[key];
@@ -108,8 +108,7 @@ export default function Browse() {
   const title = safeKind === 'list' ? listLabels[value] ?? 'Khám phá phim'
     : safeKind === 'genre' ? humanize(value)
     : safeKind === 'country' ? `Phim ${humanize(value)}`
-    : safeKind === 'year' ? `Phim năm ${value}`
-    : `Lịch phát hành ${decodeURIComponent(value)}`;
+    : `Phim năm ${value}`;
   const grid = useReveal<HTMLDivElement>(26, [safeKind, value, page, applied.category, applied.country, applied.year, applied.type, applied.status]);
   const label = safeKind === 'genre' ? 'THỂ LOẠI' : safeKind === 'country' ? 'QUỐC GIA' : safeKind === 'year' ? 'NĂM' : 'DANH SÁCH';
 

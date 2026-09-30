@@ -34,12 +34,18 @@ const imageUrl = (value: unknown): string | null => {
   return raw && /^https?:\/\//i.test(raw) ? raw : null;
 };
 
+/** Chuỗi đệm của nguồn ("Đang cập nhật", "N/A") không phải tên người/thể loại. */
+const placeholder = (name: string) =>
+  !/[\p{L}\p{N}]/u.test(name) || /^(dang cap nhat|chua cap nhat|chua ro|khong ro|n\/a|unknown|updating|none|null|undefined)$/.test(
+    name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().trim()
+  );
+
 /** Nhận `['A','B']` hoặc `[{name:'A'}]` — hai dạng vsmov dùng lẫn nhau. */
 const names = (value: unknown): string[] =>
   Array.isArray(value)
     ? value
         .map((item) => (typeof item === 'string' ? item : str((item as { name?: unknown })?.name)))
-        .filter((name): name is string => Boolean(name))
+        .filter((name): name is string => typeof name === 'string' && name.length > 0 && !placeholder(name))
     : [];
 
 /** Payload của nguồn có lúc phẳng, có lúc bọc trong `data`. */

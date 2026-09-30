@@ -111,12 +111,6 @@ test('trang năm: đổi năm đi qua route năm, không gửi năm lặp lại'
   assert.equal(target.path, '/browse/year/2023?type=single');
 });
 
-test('trang lịch phát hành (code): bộ lọc vẫn đi vào query như trang danh sách', () => {
-  const target = commitFilters('code', 'dune-2026', params(), draftOf({ year: '2024' }));
-  assert.equal(target.kind, 'search');
-  assert.equal(target.params.get('year'), '2024');
-});
-
 test('bản nháp: so sánh và rỗng', () => {
   assert.equal(filtersChanged(draftOf({ type: 'series' }), emptyFilters()), true);
   assert.equal(filtersChanged(draftOf({ type: 'series' }), draftOf({ type: 'series' })), false);

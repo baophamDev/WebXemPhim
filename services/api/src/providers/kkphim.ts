@@ -149,8 +149,6 @@ export const kkphim = {
   byYear: (year: string, filters: CatalogFilters = {}) =>
     listAt(`/v1/api/nam/${encodeURIComponent(year)}`, pick(filters, 'page', 'limit', 'country', 'category')),
   actors: async (): Promise<Taxonomy> => ({ items: [] }),
-  codes: async (): Promise<Taxonomy> => ({ items: [] }),
-  byCode: (code: string, filters: CatalogFilters = {}) => danhsachAt(code, filters),
   detail: async (slug: string): Promise<SourceDetail> => {
     const payload = await request(`/phim/${encodeURIComponent(slug)}`, 60_000);
     const data = unwrap(payload);

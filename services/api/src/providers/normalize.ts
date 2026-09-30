@@ -25,12 +25,26 @@ export const num = (value: unknown): number | null => {
   return Number.isFinite(parsed) && parsed !== 0 ? parsed : null;
 };
 
+/**
+ * Chỗ trống mà nguồn điền bằng câu đệm ("Đang cập nhật", "N/A", "Unknown"...)
+ * không phải là tên người/thể loại/quốc gia. Lọc ở đây để cả metadata lẫn dữ
+ * liệu ghi vào kho đều sạch, thay vì mỗi nơi hiển thị phải tự đoán.
+ */
+const PLACEHOLDER_NAMES = new Set([
+  'dang cap nhat', 'chua cap nhat', 'chua ro', 'khong ro', 'khong co',
+  'n/a', 'unknown', 'updating', 'none', 'null', 'undefined'
+]);
+const isPlaceholder = (name: string) => {
+  const folded = fold(name);
+  return !/[\p{L}\p{N}]/u.test(folded) || PLACEHOLDER_NAMES.has(folded);
+};
+
 /** Nhận `['A','B']` hoặc `[{name:'A'}]` — hai kiểu các nguồn hay dùng lẫn nhau. */
 export const names = (value: unknown): string[] =>
   Array.isArray(value)
     ? value
         .map((item) => (typeof item === 'string' ? item : str((item as { name?: unknown })?.name)))
-        .filter((name): name is string => Boolean(name))
+        .filter((name): name is string => typeof name === 'string' && name.length > 0 && !isPlaceholder(name))
     : [];
 
 /** URL ảnh phải là http(s) tuyệt đối; `data:`/đường dẫn tương đối bỏ đi. */

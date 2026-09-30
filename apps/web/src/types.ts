@@ -22,7 +22,7 @@ export interface SyncState { status:'idle'|'running'|'completed'|'error'|string;
  */
 export type ImportStage='queued'|'loading'|'saving'|'ready'|'failed';
 export interface ImportJob { slug:string; stage:ImportStage; source:string|null; startedAt:string; updatedAt:string; elapsedMs:number; error:string|null }
-export type CatalogKind='home'|'list'|'genre'|'country'|'year'|'code';
+export type CatalogKind='home'|'list'|'genre'|'country'|'year';
 export interface CatalogQuery { kind:CatalogKind; value?:string; page?:number; limit?:number; year?:string; country?:string; category?:string; type?:string; status?:string }
 /**
  * Một bản phụ đề tìm thấy ở nguồn ngoài. `id` là thẻ do API tự đặt, web chỉ đưa lại

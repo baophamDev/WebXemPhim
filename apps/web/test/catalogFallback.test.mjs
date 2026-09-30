@@ -43,8 +43,6 @@ test('trang chủ: bỏ limit, giữ page/type/status', () => {
 
 test('danh sách: slug đi thẳng vào /danh-sach/:slug', () => {
   assert.equal(url(catalogTarget({ url: '/catalog/lists/phim-bo', params: { page: 1 } })), '/danh-sach/phim-bo?page=1');
-  // `/danh-sach/:slug` cũng là đường của "code" (lịch phát hành theo mã).
-  assert.equal(url(catalogTarget('/catalog/codes/dune-2026')), '/danh-sach/dune-2026');
 });
 
 test('thể loại: danh mục đầy đủ vs danh sách theo thể loại', () => {

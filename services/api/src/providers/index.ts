@@ -133,14 +133,6 @@ export const catalog = {
     const { value, source } = await resolve('diễn viên', (provider) => provider.actors(), hasItems);
     return { ...checkTaxonomy(source, value), source };
   },
-  codes: async () => {
-    const { value, source } = await resolve('mã danh sách', (provider) => provider.codes(), hasItems);
-    return { ...checkTaxonomy(source, value), source };
-  },
-  byCode: async (code: string, filters: CatalogFilters = {}) => {
-    const { value, source } = await resolve(`danh sách theo mã "${code}"`, (provider) => provider.byCode(code, filters), hasItems);
-    return { ...checkList(source, value), source };
-  },
   detail: async (slug: string, report?: (stage: 'loading', source: string | null) => void) => {
     report?.('loading', vsmov.name);
     let primary: SourceDetail | null = null;

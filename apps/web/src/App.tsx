@@ -20,7 +20,6 @@ const Library = lazy(() => import('./pages/Library'));
 const Local = lazy(() => import('./pages/Local'));
 const People = lazy(() => import('./pages/People'));
 const Person = lazy(() => import('./pages/Person'));
-const Showtimes = lazy(() => import('./pages/Showtimes'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 export default function App() {
@@ -40,7 +39,6 @@ export default function App() {
         <Route path="/local" element={<Local />} />
         <Route path="/people" element={<People />} />
         <Route path="/person/:slug" element={<Person />} />
-        <Route path="/showtimes" element={<Showtimes />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

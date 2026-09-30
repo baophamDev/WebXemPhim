@@ -54,16 +54,14 @@ const TAXONOMY: Record<string, string> = {
   genres: '/the-loai',
   countries: '/quoc-gia',
   years: '/nam',
-  actors: '/dien-vien',
-  codes: '/code'
+  actors: '/dien-vien'
 };
 
 /** Danh sách theo một giá trị trong đường dẫn (`/the-loai/hanh-dong`, `/nam/2024`). */
 const BY_VALUE: Record<string, { path: string; filters: readonly string[] }> = {
   genres: { path: '/the-loai', filters: FILTERS.genre },
   countries: { path: '/quoc-gia', filters: FILTERS.country },
-  years: { path: '/nam', filters: FILTERS.year },
-  codes: { path: '/danh-sach', filters: FILTERS.list }
+  years: { path: '/nam', filters: FILTERS.year }
 };
 
 /**

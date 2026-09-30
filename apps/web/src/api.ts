@@ -62,7 +62,7 @@ if(apiBaseIsRelative&&typeof location!=='undefined'&&!/^(localhost|127\.0\.0\.1|
 
 function catalogUrl(kind:CatalogQuery['kind'],value?:string){
   if(kind==='home')return '/catalog/home';
-  const segment={list:'lists',genre:'genres',country:'countries',year:'years',code:'codes'}[kind];
+  const segment={list:'lists',genre:'genres',country:'countries',year:'years'}[kind];
   return `/catalog/${segment}/${encodeURIComponent(value??'')}`;
 }
 
@@ -149,7 +149,7 @@ export const cinemaApi=createApi({
   tagTypes:['Movie','Sync','Favorite','Progress','Health'],
   endpoints:(builder)=>({
     getCatalog:builder.query<MovieList,CatalogQuery>({query:({kind,value,...params})=>({url:catalogUrl(kind,value),params})}),
-    getTaxonomy:builder.query<TaxonomyList,'genres'|'countries'|'years'|'actors'|'codes'>({query:(kind)=>`/catalog/${kind}`}),
+    getTaxonomy:builder.query<TaxonomyList,'genres'|'countries'|'years'|'actors'>({query:(kind)=>`/catalog/${kind}`}),
     // Menu điều hướng đổi rất chậm — giữ cache 10 phút để không gọi lại mỗi lần đổi route.
     getNavigation:builder.query<Navigation,void>({query:()=>'/catalog/navigation',keepUnusedDataFor:600}),
     /**

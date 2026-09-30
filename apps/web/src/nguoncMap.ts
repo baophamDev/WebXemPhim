@@ -30,9 +30,14 @@ const imageUrl = (value: unknown): string | null => {
 const fold = (value: unknown): string =>
   String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 
-/** "A, B, C" → ['A','B','C'] — NguonC để diễn viên/đạo diễn chung một chuỗi. */
+/**
+ * "A, B, C" → ['A','B','C'] — NguonC để diễn viên/đạo diễn chung một chuỗi.
+ * Chuỗi đệm ("Đang cập nhật") không phải tên: giữ lại thì nó thành một "người"
+ * đóng cả loạt phim trên trang Diễn viên.
+ */
 const splitList = (value: unknown): string[] =>
-  (str(value) ?? '').split(',').map((part) => part.trim()).filter(Boolean);
+  (str(value) ?? '').split(',').map((part) => part.trim()).filter((part) =>
+    Boolean(part) && /[\p{L}\p{N}]/u.test(part) && !/^(dang cap nhat|chua cap nhat|chua ro|khong ro|n\/a|unknown|updating|none|null|undefined)$/.test(fold(part)));
 
 /**
  * Thể loại của NguonC, chép từ menu phim.nguonc.com (2026-09). Nguồn không có

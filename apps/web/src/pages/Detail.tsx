@@ -5,16 +5,28 @@ import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFa
 import { episodesFromNguonc } from '../nguoncMap';
 import { useNguoncDetail } from '../useNguonc';
 import { preloadPlayer } from '../chunks';
+import { removeFavorite, saveFavorite, useLibrary } from '../libraryStore';
 import { previewFromState, recallMovie, rememberMovie } from '../preview';
 import type { CastMember, Episode, Movie } from '../types';
 import { Breadcrumb, clean, EmptyState, ErrorState, image, ImportPanel, RailLabel, Shell, Spec, useImportProgress } from '../ui';
 import { useHeroEntrance } from '../ui/motion';
 
-function FavoriteButton({ movieId }: { movieId: number }) {
-  const favorite = useGetFavoriteQuery(movieId);
+/**
+ * Nút lưu phim ghi vào **cả hai** nơi: thư viện trên máy (luôn) và kho của API
+ * (khi phim đã có id thật). Nhờ vậy nút vẫn dùng được khi API chết — trước đây
+ * nó chỉ hiện với phim đã nhập kho, nên API chết là không lưu được gì cả.
+ */
+function FavoriteButton({ movie }: { movie: Movie }) {
+  const inStore = movie.id > 0;
+  const favorite = useGetFavoriteQuery(movie.id, { skip: !inStore });
   const [setFavorite, { isLoading }] = useSetFavoriteMutation();
-  const active = Boolean(favorite.data?.favorite);
-  return <button disabled={isLoading} className={active ? 'button ghost active' : 'button ghost'} onClick={() => setFavorite({ movieId, enabled: !active })}>
+  const local = useLibrary();
+  const active = Boolean(favorite.data?.favorite) || local.favorites.some((entry) => entry.movie.slug === movie.slug);
+  const toggle = () => {
+    if (active) removeFavorite(movie.slug); else saveFavorite(movie);
+    if (inStore) setFavorite({ movieId: movie.id, enabled: !active });
+  };
+  return <button disabled={isLoading} className={active ? 'button ghost active' : 'button ghost'} onClick={toggle}>
     <Heart fill={active ? 'currentColor' : 'none'} />{active ? 'Đã lưu' : 'Lưu phim'}
   </button>;
 }
@@ -99,15 +111,23 @@ export default function Detail() {
    */
   const active = Boolean(result.data && !fetched);
   const progress = useImportProgress(slug, active);
-  const direct = useNguoncDetail(slug, !fetched || stale, !fetched);
+  /** Kho chưa có tập nào (hoặc chỉ có player giả của VSMOV) thì mới cần tập trực tiếp. */
+  const needsDirect = !fetched || stale || !(fetched.episodes?.length);
+  const direct = useNguoncDetail(slug, needsDirect, !fetched);
   /**
    * Bản mô tả của thẻ phim vừa bấm — có poster, tên, năm, điểm. Đủ để vẽ nửa trên
    * của trang ngay khi điều hướng, trong lúc API còn đang kéo danh sách tập về.
    */
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
   const directEpisodes = direct.data ? episodesFromNguonc(direct.data.episodes) : null;
+  /**
+   * Tập trong kho thắng tập trực tiếp khi chúng phát được: chúng có `id` thật,
+   * nhờ đó tiến trình gắn đúng tập và "Xem tiếp" hoạt động. Tập của NguonC (id
+   * âm) chỉ thay vào khi kho chưa có gì phát được.
+   */
+  const preferDirect = Boolean(directEpisodes?.length) && (!fetched || stale || !(fetched.episodes?.length));
   const movie: Movie | null =
-    (fetched && directEpisodes?.length ? { ...fetched, episodes: directEpisodes } : fetched)
+    (fetched && preferDirect ? { ...fetched, episodes: directEpisodes! } : fetched)
     ?? (direct.data ? ({ ...direct.data.movie, episodes: directEpisodes ?? [] } as Movie) : null)
     ?? preview;
   const failed = result.isError || Boolean(progress.failure);
@@ -153,8 +173,8 @@ export default function Detail() {
             {first
               ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`} state={{ preview: movie }} onPointerDown={preloadPlayer}><Play fill="currentColor" />Xem ngay</Link>
               : <button className="button primary" disabled><Play />{loading ? 'Đang tải nguồn phát' : 'Chưa có tập'}</button>}
-            {/* Lưu phim cần id trong kho — bản mô tả từ thẻ phim chưa có id. */}
-            {inStore && fetched ? <FavoriteButton movieId={fetched.id} /> : null}
+            {/* Lưu phim được cả khi kho chưa có bản ghi: bản trên máy là chỗ lưu chính. */}
+            <FavoriteButton movie={movie} />
             {pathname.startsWith('/movie/') && !loading && inStore ? <ImportButton slug={slug} /> : null}
           </div>
         </div>

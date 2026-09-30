@@ -136,8 +136,6 @@ export const vsmov = {
   byYear: (year: string, filters: CatalogFilters = {}) =>
     listAt(`/nam/${encodeURIComponent(year)}`, pick(filters, 'page', 'limit', 'type', 'status')),
   actors: async (): Promise<Taxonomy> => normalizeTaxonomy(await request('/dien-vien', 3_600_000)),
-  codes: async (): Promise<Taxonomy> => normalizeTaxonomy(await request('/code', 3_600_000)),
-  byCode: (code: string, filters: CatalogFilters = {}) => danhsachAt(code, filters),
   detail: async (slug: string): Promise<SourceDetail> => {
     const payload = await request(`/phim/${encodeURIComponent(slug)}`, 60_000);
     const data = unwrap(payload);

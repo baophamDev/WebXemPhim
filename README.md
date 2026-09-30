@@ -27,6 +27,8 @@ apps/web/src/theme.ts     Chế độ sáng/tối/theo máy
 apps/web/src/boot.ts      Nhặt lại request mà index.html đã bắn trước
 apps/web/src/chunks.ts    Chunk nạp lười + hâm nóng trước khi bấm
 apps/web/src/filters.ts   Bộ lọc Khám Phá: khoá lọc + bảng dịch giá trị lọc ↔ đường dẫn
+apps/web/src/library.ts   Mô hình thư viện trên máy: gộp tập theo phim, tách đang xem/đã xem
+apps/web/src/libraryStore.ts Nối mô hình thư viện với localStorage và React
 services/api/             Backend Express
 services/api/src/db.ts    Kết nối PostgreSQL
 services/api/src/http.ts  Vỏ bọc route: bắt lỗi async, Cache-Control cho route chỉ đọc
@@ -46,6 +48,8 @@ vercel.json               Cấu hình deploy Vercel
 Nguồn catalog có ba tầng: **VSMOV là nguồn chính, KKPhim (`phimapi.com`) thay thế khi VSMOV lỗi, trả rỗng hoặc hết luồng phát, NguonC (`phim.nguonc.com`) bồi tập embed khi cả hai nguồn kia đều không có luồng phát** (VSMOV đang trả `link_m3u8` rỗng ở mọi tập), xem mục [11](#11-tầng-nguồn-catalog). Menu thể loại là **hợp** của các nguồn, nên thể loại chỉ có ở NguonC (Tâm Lý, Tình Cảm, Miền Tây...) vẫn hiện và bấm được. Database dùng hai trường `provider` và `provider_id`, vì vậy thêm nguồn không cần đổi schema.
 
 Menu **Khám phá** trên thanh trên mở khi rê chuột: cột trái là năm nhóm lọc (thể loại, quốc gia, năm, định dạng, trạng thái), cột phải là giá trị của nhóm đang trỏ tới, và mọi giá trị đều là link thật. Trên trang Khám phá, năm ô lọc chỉ ghi vào URL khi bấm **Áp dụng** — chỉnh cả bộ rồi xem kết quả một lượt thay vì một request cho mỗi ô; nút chỉ bật khi bản nháp đã khác bản đang xem. Bảng dịch giữa giá trị lọc và đường dẫn nằm ở [apps/web/src/filters.ts](apps/web/src/filters.ts) — chỗ dễ lệch một chữ mà không ai thấy — nên có test riêng.
+
+Thư viện là dữ liệu **của thiết bị trước, API sau**: phim đã lưu và tiến trình xem ghi vào `localStorage` (khoá `cinema-library-v1`) ngay khi bấm, nên API chết vẫn còn "Đang xem"/"Đã xem"/"Phim đã lưu"; khi API sống thì bản ghi cũng lên kho. Tiến trình trong kho ghi theo **tập**, nên trang Thư viện gộp lại thành **một thẻ cho mỗi phim** (giữ tập mới nhất) rồi mới tách hai mục — xem [apps/web/src/library.ts](apps/web/src/library.ts). Phía API, `upsertEpisodes()` cập nhật tập **tại chỗ** và khớp thêm theo số tập khi nguồn đổi cách gọi tên ("1" ⇄ "Tập 01", "Vietsub #1" ⇄ "Vietsub"), nhờ vậy bấm "Làm mới nguồn" không cấp id mới và không xoá mất tiến trình đang xem.
 
 Bấm vào một phim chưa từng xem thì trang chi tiết mở ngay, còn việc kéo dữ liệu về chạy ở nền và có thanh tiến trình riêng — mục [12](#12-mở-một-phim-chưa-có-trong-db).
 
@@ -433,7 +437,7 @@ npm run lint
 npm run build
 ```
 
-`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của tầng nguồn catalog (resolver, các adapter HTML theo slug, TMDB, TheTVDB), của hàng đợi nhập phim, của header cache (`services/api/test/http.test.js`), của phép khớp URL bắn trước (`apps/web/test/boot.test.mjs`) và của bảng dịch bộ lọc Khám Phá (`apps/web/test/filters.test.mjs`) — tất cả trên dữ liệu tự dựng, không cần mạng, khoá API hay database. Adapter nào cần khoá thì test tự đặt khoá giả và thay `globalThis.fetch`, nên CI không có bí mật nào vẫn chạy đủ.
+`typecheck`, `test` và `build` phải kết thúc với exit code `0`. `npm test` chạy bộ test của tầng nguồn catalog (resolver, các adapter HTML theo slug, TMDB, TheTVDB), của hàng đợi nhập phim, của header cache (`services/api/test/http.test.js`), của phép khớp URL bắn trước (`apps/web/test/boot.test.mjs`), của bảng dịch bộ lọc Khám Phá (`apps/web/test/filters.test.mjs`) và của mô hình thư viện trên máy (`apps/web/test/library.test.mjs` — gộp tập theo phim, tách "Đang xem"/"Đã xem", dữ liệu localStorage hỏng) — tất cả trên dữ liệu tự dựng, không cần mạng, khoá API hay database. Adapter nào cần khoá thì test tự đặt khoá giả và thay `globalThis.fetch`, nên CI không có bí mật nào vẫn chạy đủ.
 
 `npm run lint` dùng ESLint 9 với cấu hình ở [eslint.config.mjs](eslint.config.mjs) — một file cho cả hai workspace. Cảnh báo (`warn`) không làm lệnh thất bại, chỉ lỗi (`error`) mới. `npm run lint:fix` sửa những gì sửa được tự động.
 
@@ -492,6 +496,8 @@ Riêng `detail()` đi xa hơn: nguồn được chọn phải có **ít nhất m
 5. Cả ba đều không có thì trả bản VSMOV (còn metadata + embed) thay vì mất cả trang.
 
 Ngoài ra `respondWithMovie()` trong `server.ts` **tự chữa bản ghi cũ**: phim đã lưu mà không tập nào có `m3u8` (dấu hiệu của bản nhập từ VSMOV trước đây) thì mở một job nhập lại ở nền, chặn theo giờ để phim mà không nguồn nào có luồng thật không bị nhập mãi. Mở lại trang là bản mới đã nằm trong kho.
+
+Cast chỉ có ở bản **detail** của nguồn, còn danh sách phim thì không kèm — nên trang Diễn viên tự bồi dần: `backfillMissingCast()` trong `server.ts` lấy từng lô nhỏ phim chưa có người trong `movie_cast`, đẩy vào đúng hàng đợi nhập rồi chờ xong mới lấy lô kế (chạy khi mở `/api/people`, sau mỗi lần sync, và một lượt ngắn sau khi khởi động; có cooldown). Tên rác kiểu "Đang cập nhật" bị lọc ở cả `normalize.names()` lẫn `replaceCast()`. Ảnh diễn viên lấy từ VSMOV tối đa 1 lần/ngày và chỉ tải khi trong kho còn người thiếu ảnh.
 
 ### 11.2. Thêm một nguồn
 

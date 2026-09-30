@@ -180,8 +180,6 @@ export const nguonc = {
   years: async (): Promise<Taxonomy> => ({ items: [] }),
   byYear: (year: string, filters: CatalogFilters = {}) => listAt(`/films/nam-phat-hanh/${encodeURIComponent(year)}`, filters),
   actors: async (): Promise<Taxonomy> => ({ items: [] }),
-  codes: async (): Promise<Taxonomy> => ({ items: [] }),
-  byCode: (code: string, filters: CatalogFilters = {}) => listAt(`/films/danh-sach/${encodeURIComponent(code)}`, filters),
   detail: async (slug: string): Promise<SourceDetail> => {
     const payload = await request(`/film/${encodeURIComponent(slug)}`, 60_000);
     const data = unwrap(payload);

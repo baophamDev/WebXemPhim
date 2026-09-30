@@ -89,6 +89,10 @@ async function migrateSchema() {
   await sql.unsafe(`
     -- Tên đã bỏ dấu, lưu sẵn để tìm kiếm "nguoi nhen" ra "Người Nhện".
     ALTER TABLE movies ADD COLUMN IF NOT EXISTS search_text TEXT;
+    -- Lần cuối thử bồi diễn viên/đạo diễn cho phim này. Danh sách của nguồn
+    -- không kèm cast, nên phải hỏi detail từng phim; cột này giữ cho việc bồi
+    -- ở nền là hữu hạn (không thử lại mãi một phim) mà vẫn có nhịp thử lại.
+    ALTER TABLE movies ADD COLUMN IF NOT EXISTS cast_checked_at TIMESTAMPTZ;
 
     -- Người (diễn viên/đạo diễn) là thực thể riêng, có slug để đặt vào URL.
     CREATE TABLE IF NOT EXISTS people (
@@ -167,6 +171,12 @@ async function backfill() {
     }
     console.log(`Backfill: đã chuyển ${byMovie.size} phim từ movie_people sang people/movie_cast`);
   }
+
+  // Dọn "người" sinh ra từ câu đệm của nguồn (xem `isJunkName`). Bản ghi cũ đã
+  // nằm trong kho từ trước, còn bản mới thì đã bị lọc lúc ghi.
+  const cleaned = await sql`
+    DELETE FROM people WHERE name_folded = ANY(${junkFoldedNames}::text[])`;
+  if (cleaned.count) console.log(`Backfill: đã xoá ${cleaned.count} tên rác khỏi people`);
 }
 
 
@@ -174,6 +184,20 @@ const scalar = (value: unknown) => value == null ? null : String(value);
 const list = (value: unknown): string[] => Array.isArray(value)
   ? value.map((item) => typeof item === 'string' ? item : String((item as { name?: unknown })?.name ?? '')).filter(Boolean)
   : [];
+
+/**
+ * Vài nguồn trả chỗ trống bằng một câu đệm thay vì bỏ hẳn field — gặp nhiều nhất
+ * là KKPhim trả `director: ["Đang cập nhật"]`. Coi như không có tên: giữ lại thì
+ * kho có một "người" tên *Đang cập nhật* đóng vài phim, hiện lên trang Diễn viên
+ * còn tệ hơn là thiếu dữ liệu.
+ */
+const junkFoldedNames = [
+  'dang cap nhat', 'chua cap nhat', 'chua ro', 'khong ro', 'khong co',
+  'n/a', 'unknown', 'updating', 'none', 'null', 'undefined'
+];
+/** Tên chỉ gồm dấu câu/khoảng trắng ("...", "--") cũng là chỗ trống của nguồn. */
+const isJunkName = (folded: string) => !/[\p{L}\p{N}]/u.test(folded) || junkFoldedNames.includes(folded);
+
 
 function mapMovie(row: any): Movie {
   return {
@@ -217,11 +241,12 @@ async function replaceCast(tx: Executor, movieId: number, actors: string[], dire
     for (const raw of names) {
       const name = String(raw ?? '').trim();
       const slug = slugifyName(name);
-      if (!name || !slug) continue;
+      const folded = fold(name);
+      if (!name || !slug || isJunkName(folded)) continue;
       const key = `${kind}:${slug}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      entries.push({ slug, name, folded: fold(name), kind, position: position++ });
+      entries.push({ slug, name, folded, kind, position: position++ });
     }
   }
   if (!entries.length) return;
@@ -281,10 +306,80 @@ export async function upsertEpisodes(movieId: number, groups: any[] = []) {
       embed_url: String(episode.link_embed), m3u8_url: episode.link_m3u8 ?? null
     });
   }
-  // Một series 100 tập trước đây là 100 round-trip; giờ là 2 câu lệnh.
+  /**
+   * Cập nhật **tại chỗ**, không xoá-rồi-thêm: `id` của tập là thứ `watch_progress`
+   * trỏ tới (khoá ngoại CASCADE) và là thứ nằm trong link xem. Xoá rồi thêm lại
+   * cấp id mới, nghĩa là mỗi lần "Làm mới nguồn" hay mỗi lần bồi cast ở nền là
+   * một lần **xoá sạch tiến trình xem của phim đó** — thư viện mất "Xem tiếp"
+   * dù người xem chưa làm gì sai.
+   *
+   * Khớp hai lượt vì nguồn hay đổi cách gọi tên giữa các lần nhập: cùng một tập,
+   * bên KKPhim là "Tập 01", bên NguonC là "1", và tên server cũng đổi
+   * ("Vietsub #1" ⇄ "Vietsub"). Khớp khít theo (server, tên) trước, phần còn lại
+   * ghép theo số tập — cùng số tập trong cùng một phim thì gần như chắc chắn là
+   * cùng một tập, nên id giữ nguyên và tiến trình không mất.
+   *
+   * Tập không còn trong nguồn thì mới xoá (tiến trình của tập đó cũng hết ý
+   * nghĩa), và danh sách rỗng thì giữ nguyên bản cũ: nguồn lỗi trả về rỗng không
+   * được phép xoá sạch tập đang phát được.
+   */
   await sql.begin(async (tx) => {
-    await tx`DELETE FROM episodes WHERE movie_id=${movieId}`;
-    if (rows.length) await tx`INSERT INTO episodes ${tx(rows, 'movie_id', 'server_name', 'name', 'episode_number', 'embed_url', 'm3u8_url')}`;
+    if (!rows.length) return;
+    const existing = (await tx`
+      SELECT id, server_name, name, episode_number FROM episodes WHERE movie_id=${movieId}`) as unknown as
+      { id: number; server_name: string; name: string; episode_number: number | null }[];
+    const byName = new Map<string, number>();
+    const byNumber = new Map<number, number[]>();
+    for (const row of existing) {
+      byName.set(`${row.server_name}\u0000${row.name}`, row.id);
+      if (row.episode_number != null) {
+        const list = byNumber.get(row.episode_number) ?? [];
+        list.push(row.id);
+        byNumber.set(row.episode_number, list);
+      }
+    }
+    const used = new Set<number>();
+    const matched: { id: number; row: typeof rows[number] }[] = [];
+    const pending: typeof rows = [];
+    for (const row of rows) {
+      const id = byName.get(`${row.server_name}\u0000${row.name}`);
+      if (id !== undefined && !used.has(id)) { used.add(id); matched.push({ id, row }); }
+      else pending.push(row);
+    }
+    const fresh: typeof rows = [];
+    for (const row of pending) {
+      if (row.episode_number == null) { fresh.push(row); continue; }
+      const candidates = (byNumber.get(row.episode_number) ?? []).filter((id) => !used.has(id));
+      const picked = candidates.length === 1
+        ? candidates[0]
+        : candidates.find((id) => existing.find((item) => item.id === id)?.server_name === row.server_name);
+      if (picked === undefined) { fresh.push(row); continue; }
+      used.add(picked); matched.push({ id: picked, row });
+    }
+    // Xoá trước khi cập nhật: một tập đổi tên thành đúng tên của tập sắp bị xoá sẽ
+    // đụng UNIQUE(movie_id, server_name, name) nếu thứ tự ngược lại.
+    const stale = existing.filter((row) => !used.has(row.id)).map((row) => row.id);
+    if (stale.length) await tx`DELETE FROM episodes WHERE id = ANY(${stale}::int[])`;
+    if (matched.length) {
+      await tx`
+        UPDATE episodes AS e SET
+          server_name=v.server_name, name=v.name, episode_number=v.episode_number,
+          embed_url=v.embed_url, m3u8_url=v.m3u8_url
+        FROM unnest(
+          ${matched.map((item) => item.id)}::int[], ${matched.map((item) => item.row.server_name)}::text[],
+          ${matched.map((item) => item.row.name)}::text[], ${matched.map((item) => item.row.episode_number)}::int[],
+          ${matched.map((item) => item.row.embed_url)}::text[], ${matched.map((item) => item.row.m3u8_url)}::text[]
+        ) AS v(id, server_name, name, episode_number, embed_url, m3u8_url)
+        WHERE e.id = v.id`;
+    }
+    const keep = matched.map((item) => item.id);
+    if (fresh.length) {
+      const saved = (await tx`
+        INSERT INTO episodes ${tx(fresh, 'movie_id', 'server_name', 'name', 'episode_number', 'embed_url', 'm3u8_url')}
+        RETURNING id`) as unknown as { id: number }[];
+      keep.push(...saved.map((row) => row.id));
+    }
+    await tx`DELETE FROM episodes WHERE movie_id=${movieId} AND id <> ALL(${keep}::int[])`;
   });
 }
 
@@ -417,15 +512,60 @@ export async function getPerson(slug: string): Promise<(Person & { kinds: string
   return (rows[0] as any) ?? null;
 }
 
-/** Ảnh diễn viên chỉ có ở provider, ghép vào bảng people theo tên đã bỏ dấu. */
+/**
+ * Ảnh diễn viên chỉ có ở provider, ghép vào bảng people theo tên đã bỏ dấu.
+ *
+ * Chia lô vì nguồn trả về hàng trăm nghìn người: một câu UPDATE với mảng
+ * 100k phần tử là một query khổng lồ đi qua pooler, dễ chạm trần kích thước
+ * tham số và giữ connection lâu. Lô 500 vẫn nhanh mà không có trần nào.
+ */
 export async function updatePeopleThumbs(entries: { name: string; thumbUrl: string | null }[]) {
   const usable = entries.filter((entry) => entry.thumbUrl && entry.name);
   if (!usable.length) return 0;
-  const result = await sql`
-    UPDATE people SET thumb_url=v.thumb_url, updated_at=NOW()
-    FROM (SELECT * FROM unnest(${usable.map((e) => fold(e.name))}::text[], ${usable.map((e) => e.thumbUrl!)}::text[]) AS t(name_folded,thumb_url)) AS v
-    WHERE people.name_folded=v.name_folded AND people.thumb_url IS DISTINCT FROM v.thumb_url`;
-  return result.count;
+  let updated = 0;
+  for (let start = 0; start < usable.length; start += 500) {
+    const chunk = usable.slice(start, start + 500);
+    const result = await sql`
+      UPDATE people SET thumb_url=v.thumb_url, updated_at=NOW()
+      FROM (SELECT * FROM unnest(${chunk.map((e) => fold(e.name))}::text[], ${chunk.map((e) => e.thumbUrl!)}::text[]) AS t(name_folded,thumb_url)) AS v
+      WHERE people.name_folded=v.name_folded AND people.thumb_url IS DISTINCT FROM v.thumb_url`;
+    updated += result.count;
+  }
+  return updated;
+}
+
+/**
+ * Tên (đã bỏ dấu) của những người còn thiếu ảnh, để lọc từ danh sách nguồn.
+ * Chỉ lấy người đang có mặt trong `people` — danh sách của nguồn có cả trăm
+ * nghìn người mà kho chỉ cần ảnh cho những người thật sự xuất hiện trong phim.
+ */
+export async function listPeopleMissingThumbs(limit = 5000) {
+  return sql<{ nameFolded: string }[]>`
+    SELECT name_folded AS "nameFolded" FROM people
+    WHERE thumb_url IS NULL ORDER BY updated_at DESC LIMIT ${limit}`;
+}
+
+/**
+ * Lấy một lô phim chưa có cast để bồi ở nền, đánh dấu "đã thử" ngay trong cùng
+ * câu lệnh — hai lượt gọi song song không nhận trùng một phim.
+ *
+ * `cast_checked_at` cũ là mốc để thử lại: phim mà nguồn không có cast (hoặc
+ * lần trước mạng đổ) vẫn được thử lại, nhưng không phải mỗi lượt mở trang.
+ */
+export async function takeMoviesMissingCast(limit = 8, retryAfterDays = 3) {
+  // Mốc thử lại tính ở JS: `NOW() - interval` với tham số hay bị suy luận kiểu
+  // chữ/số không khớp, còn một timestamp gửi thẳng thì luôn đúng.
+  const cutoff = new Date(Date.now() - retryAfterDays * 86_400_000);
+  return sql<{ slug: string }[]>`
+    UPDATE movies SET cast_checked_at=NOW()
+    WHERE id IN (
+      SELECT id FROM movies m
+      WHERE NOT EXISTS(SELECT 1 FROM movie_cast c WHERE c.movie_id=m.id)
+        AND (m.cast_checked_at IS NULL OR m.cast_checked_at < ${cutoff})
+      ORDER BY m.cast_checked_at ASC NULLS FIRST, m.updated_at DESC
+      LIMIT ${limit}
+    )
+    RETURNING slug`;
 }
 
 /** Taxonomy dựng từ DB, dùng khi provider chết. */

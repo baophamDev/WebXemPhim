@@ -5,15 +5,15 @@ import cors from 'cors';
 import { z } from 'zod';
 import {
   closeDatabase, getContinue, getEpisodes, getMovie, getPerson, getSyncState, initDatabase, isFavorite,
-  listCountriesFromDb, listFavorites, listGenresFromDb, listMovies, listPeople, listYearsFromDb,
-  saveProgress, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
+  listCountriesFromDb, listFavorites, listGenresFromDb, listMovies, listPeople, listPeopleMissingThumbs, listYearsFromDb,
+  saveProgress, takeMoviesMissingCast, toggleFavorite, updatePeopleThumbs, upsertEpisodes, upsertMovie
 } from './db.js';
 import { describeFailure, isConfigFailure, shortCause } from './errors.js';
 import { asyncRoute, serverCachedRoute } from './http.js';
 import { cacheInvalidate, routeKey } from './cache.js';
 import { forgetImport, importJob, importQueueSize, startImport, waitForImport, type ImportJob, type Report } from './importer.js';
 import { catalog, type CatalogFilters } from './providers/index.js';
-import { slugifyName } from './text.js';
+import { fold, slugifyName } from './text.js';
 import { syncLatest } from './sync.js';
 
 const app = express();
@@ -147,20 +147,82 @@ async function respondWithMovie(req: express.Request, res: express.Response, slu
 }
 
 /**
- * VSMOV là nguồn duy nhất có ảnh diễn viên, nhưng gọi mỗi request thì chậm.
- * Ghép ảnh vào bảng people tối đa 1 lần/giờ, và lỗi nguồn thì bỏ qua im lặng
- * — thiếu ảnh không phải lý do để trang diễn viên trả lỗi.
+ * VSMOV là nguồn duy nhất có ảnh diễn viên, nhưng danh sách của nó là **cả kho
+ * người** (~200k người, ~24 MB): gọi mỗi request thì chậm, mà ghi cả danh sách
+ * vào DB còn tệ hơn — kho chỉ cần ảnh cho người thật sự xuất hiện trong phim.
+ *
+ * Nên: tối đa 1 lần/ngày, chỉ khi trong kho còn người thiếu ảnh (không còn thì
+ * không tải gì cả), lọc danh sách nguồn theo đúng những tên đó rồi ghi thành lô
+ * nhỏ. Lỗi nguồn thì bỏ qua im lặng — thiếu ảnh không phải lý do để trang diễn
+ * viên trả lỗi, nhưng vẫn phải chờ trước khi thử lại vì mỗi lần thử là 24 MB.
  */
 let thumbsSyncedAt = 0;
+let thumbsSyncing = false;
+const THUMBS_COOLDOWN_MS = 24 * 60 * 60_000;
+const THUMBS_RETRY_MS = 30 * 60_000;
+const THUMBS_MAX_UPDATES = 2000;
 async function refreshPeopleThumbs() {
-  if (Date.now() - thumbsSyncedAt < 3_600_000) return;
-  thumbsSyncedAt = Date.now();
+  if (thumbsSyncing || Date.now() - thumbsSyncedAt < THUMBS_COOLDOWN_MS) return;
+  thumbsSyncing = true;
   try {
+    const missing = await listPeopleMissingThumbs(THUMBS_MAX_UPDATES * 2);
+    if (!missing.length) { thumbsSyncedAt = Date.now(); return; }
     const remote = await catalog.actors();
-    const updated = await updatePeopleThumbs(remote.items.map((item) => ({ name: item.name, thumbUrl: item.thumbUrl })));
+    const byName = new Map<string, string>();
+    for (const item of remote.items) {
+      const name = fold(item.name);
+      if (name && item.thumbUrl && !byName.has(name)) byName.set(name, item.thumbUrl);
+    }
+    const updates = missing
+      .map((row) => ({ name: row.nameFolded, thumbUrl: byName.get(row.nameFolded) ?? null }))
+      .filter((entry) => entry.thumbUrl)
+      .slice(0, THUMBS_MAX_UPDATES);
+    const updated = updates.length ? await updatePeopleThumbs(updates) : 0;
     if (updated) console.log(`Đã cập nhật ảnh cho ${updated} diễn viên`);
+    thumbsSyncedAt = Date.now();
   } catch (error) {
+    thumbsSyncedAt = Date.now() - THUMBS_COOLDOWN_MS + THUMBS_RETRY_MS;
     console.warn('Không lấy được ảnh diễn viên từ nguồn nào:', (error as Error).message);
+  } finally {
+    thumbsSyncing = false;
+  }
+}
+
+/**
+ * Bồi diễn viên/đạo diễn cho kho.
+ *
+ * Danh sách phim của nguồn không kèm cast — chỉ bản detail mới có — nên trang
+ * diễn viên chỉ có dữ liệu khi từng phim được mở ra. Người xem thật chỉ mở vài
+ * phim, còn sync nền cố tình không kéo detail (hàng trăm request), nên chỗ này
+ * làm thay: mỗi lượt lấy một lô nhỏ phim chưa có cast, đẩy vào **đúng hàng đợi
+ * nhập** của API (đã giới hạn 6 job song song) rồi chờ xong mới lấy lô kế. Nhờ
+ * vậy trang Diễn viên tự đầy dần mà không dội một loạt request vào nguồn.
+ *
+ * Mỗi lần nhập cũng ghi luôn danh sách tập, nên các phim đã bồi có `episode_id`
+ * thật — điều kiện để "Xem tiếp" trong thư viện hoạt động.
+ */
+const CAST_BACKFILL_BATCH = 8;
+const CAST_BACKFILL_ROUNDS = 3;
+const CAST_BACKFILL_COOLDOWN_MS = 60_000;
+let castBackfillStartedAt = 0;
+let castBackfilling = false;
+async function backfillMissingCast() {
+  if (castBackfilling || Date.now() - castBackfillStartedAt < CAST_BACKFILL_COOLDOWN_MS) return;
+  castBackfillStartedAt = Date.now();
+  castBackfilling = true;
+  try {
+    for (let round = 0; round < CAST_BACKFILL_ROUNDS; round += 1) {
+      const rows = await takeMoviesMissingCast(CAST_BACKFILL_BATCH);
+      if (!rows.length) break;
+      for (const row of rows) queueImport(row.slug);
+      // Chờ lô này settle rồi mới xin lô kế: hàng đợi tự giới hạn song song, còn
+      // vòng lặp ở đây chỉ giữ cho số phim được thử trong một lượt là hữu hạn.
+      await Promise.all(rows.map((row) => waitForImport(row.slug).catch(() => undefined)));
+    }
+  } catch (error) {
+    console.warn('Bồi diễn viên/đạo diễn thất bại:', (error as Error).message);
+  } finally {
+    castBackfilling = false;
   }
 }
 
@@ -300,8 +362,6 @@ app.get('/api/catalog/navigation', serverCachedRoute(600, catalogKey('catalog:na
   return { genres: genres.items, countries: countries.items, years: years.items };
 }));
 
-app.get('/api/catalog/codes', serverCachedRoute(600, catalogKey('catalog:codes'), () => catalog.codes()));
-app.get('/api/catalog/codes/:code', serverCachedRoute(60, catalogKey('catalog:code'), (req) => catalog.byCode(z.string().trim().min(1).max(80).parse(req.params.code), queryFilters(req.query))));
 app.get('/api/catalog/movies/:slug', asyncRoute(async (req, res) => { await respondWithMovie(req, res, slugSchema.parse(req.params.slug)); }));
 
 const moviesQuerySchema = z.object({
@@ -331,6 +391,7 @@ app.get('/api/people', asyncRoute(async (req, res) => {
     limit: z.coerce.number().int().min(1).max(120).default(60)
   }).parse(req.query);
   void refreshPeopleThumbs();
+  void backfillMissingCast();
   res.json(await listPeople({ ...query, q: query.q || undefined }));
 }));
 
@@ -409,6 +470,7 @@ app.post('/api/sync/start', asyncRoute(async (req, res) => {
   void syncLatest(pages.pages)
     .then(() => cacheInvalidate('web:catalog:'))
     .then(() => cacheInvalidate('web:movies'))
+    .then(() => backfillMissingCast())
     .catch((error) => console.error('Catalog sync failed:', error));
   res.status(202).json({ started: true });
 }));
@@ -513,6 +575,9 @@ async function initDatabaseWithRetry(attempt = 1): Promise<void> {
     await initDatabase();
     dbState.ready = true; dbState.reason = null;
     console.log('Database ready');
+    // Sau khi kho sẵn sàng thì bồi dần cast ở nền. Chờ một nhịp ngắn để việc
+    // migrate/backfill schema lắng xuống rồi mới mở job nhập đầu tiên.
+    setTimeout(() => void backfillMissingCast(), 15_000).unref();
   } catch (error) {
     dbState.ready = false; dbState.reason = shortCause(error);
     if (isConfigFailure(error)) {
