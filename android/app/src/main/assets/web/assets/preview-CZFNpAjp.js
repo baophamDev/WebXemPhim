@@ -1,0 +1,1 @@
+const r=new Map;function l(e){if(e!=null&&e.slug&&(r.has(e.slug)&&r.delete(e.slug),r.set(e.slug,e),r.size>400)){const n=r.keys().next().value;n!==void 0&&r.delete(n)}}function u(e){if(e)for(const n of e)l(n)}function s(e){var n;return e&&(n=r.get(e))!=null?n:null}function t(e){const n=e==null?void 0:e.preview;return n!=null&&n.slug?n:null}export{s as a,l as b,t as p,u as r};

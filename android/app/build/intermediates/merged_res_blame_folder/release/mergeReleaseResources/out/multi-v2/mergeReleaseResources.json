@@ -1,0 +1,62 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.localcinema.android.app-release-4:/values_values.arsc.flat",
+            "map": [
+                {
+                    "source": "D:\\Coding\\web film\\WebXemPhim\\android\\app\\src\\main\\res\\values\\styles.xml",
+                    "from": {
+                        "startLines": "3",
+                        "startColumns": "2",
+                        "startOffsets": "132",
+                        "endLines": "8",
+                        "endColumns": "10",
+                        "endOffsets": "492"
+                    },
+                    "to": {
+                        "startLines": "6",
+                        "startColumns": "4",
+                        "startOffsets": "263",
+                        "endLines": "11",
+                        "endColumns": "10",
+                        "endOffsets": "623"
+                    }
+                },
+                {
+                    "source": "D:\\Coding\\web film\\WebXemPhim\\android\\app\\src\\main\\res\\values\\strings.xml",
+                    "from": {
+                        "startLines": "3",
+                        "startColumns": "2",
+                        "startOffsets": "141",
+                        "endColumns": "48",
+                        "endOffsets": "187"
+                    },
+                    "to": {
+                        "startLines": "5",
+                        "startColumns": "4",
+                        "startOffsets": "212",
+                        "endColumns": "50",
+                        "endOffsets": "258"
+                    }
+                },
+                {
+                    "source": "D:\\Coding\\web film\\WebXemPhim\\android\\app\\src\\main\\res\\values\\colors.xml",
+                    "from": {
+                        "startLines": "8,7,9",
+                        "startColumns": "2,2,2",
+                        "startOffsets": "483,434,528",
+                        "endColumns": "44,48,56",
+                        "endOffsets": "525,480,582"
+                    },
+                    "to": {
+                        "startLines": "2,3,4",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,102,153",
+                        "endColumns": "46,50,58",
+                        "endOffsets": "97,148,207"
+                    }
+                }
+            ]
+        }
+    ]
+}
