@@ -1,0 +1,7 @@
+com.localcinema.android.app-pngs-0 D:\Coding\web film\WebXemPhim\android\app\build\generated\res\pngs\release
+com.localcinema.android.app-resValues-1 D:\Coding\web film\WebXemPhim\android\app\build\generated\res\resValues\release
+com.localcinema.android.app-packageReleaseResources-2 D:\Coding\web film\WebXemPhim\android\app\build\intermediates\incremental\release\packageReleaseResources\merged.dir
+com.localcinema.android.app-packageReleaseResources-3 D:\Coding\web film\WebXemPhim\android\app\build\intermediates\incremental\release\packageReleaseResources\stripped.dir
+com.localcinema.android.app-release-4 D:\Coding\web film\WebXemPhim\android\app\build\intermediates\merged_res\release\mergeReleaseResources
+com.localcinema.android.app-main-5 D:\Coding\web film\WebXemPhim\android\app\src\main\res
+com.localcinema.android.app-release-6 D:\Coding\web film\WebXemPhim\android\app\src\release\res

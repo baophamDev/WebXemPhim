@@ -1,0 +1,99 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<!--
+3  App chỉ có một Activity: một WebView nạp bản web đã đóng gói trong APK.
+4
+5  Bốn khai báo đáng chú ý:
+6  - INTERNET: bắt buộc. Giao diện nằm trong máy nhưng dữ liệu phim thì không.
+7  - usesCleartextTraffic + networkSecurityConfig: API chạy trong nhà là
+8    http://192.168.x.x:4000, không có TLS. Thiếu hai dòng này thì WebView chặn
+9    trước cả CORS và người dùng chỉ thấy "API ngoại tuyến".
+10  - LEANBACK_LAUNCHER: để app hiện trên màn hình chính của Android TV (box),
+11    song song với LAUNCHER cho điện thoại. touchscreen required=false để máy
+12    không cảm ứng cũng cài được.
+13  - configChanges: xoay máy / đổi uiMode không được làm Activity dựng lại, vì
+14    dựng lại là mất chỗ đang xem trong WebView.
+15-->
+16<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+17    package="com.localcinema.android"
+18    android:versionCode="1"
+19    android:versionName="1.0.0" >
+20
+21    <uses-sdk
+22        android:minSdkVersion="23"
+23        android:targetSdkVersion="35" />
+24
+25    <uses-permission android:name="android.permission.INTERNET" />
+25-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:18:3-65
+25-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:18:20-62
+26    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+26-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:19:3-77
+26-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:19:20-74
+27
+28    <uses-feature
+28-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:21:3-88
+29        android:name="android.hardware.touchscreen"
+29-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:21:17-60
+30        android:required="false" />
+30-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:21:61-85
+31    <uses-feature
+31-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:22:3-85
+32        android:name="android.software.leanback"
+32-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:22:17-57
+33        android:required="false" />
+33-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:22:58-82
+34
+35    <application
+35-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:24:3-51:17
+36        android:allowBackup="true"
+36-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:25:7-33
+37        android:extractNativeLibs="false"
+38        android:hardwareAccelerated="true"
+38-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:26:7-41
+39        android:icon="@mipmap/ic_launcher"
+39-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:27:7-41
+40        android:label="@string/app_name"
+40-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:28:7-39
+41        android:networkSecurityConfig="@xml/network_security_config"
+41-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:29:7-67
+42        android:supportsRtl="true"
+42-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:30:7-33
+43        android:theme="@style/AppTheme"
+43-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:31:7-38
+44        android:usesCleartextTraffic="true" >
+44-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:32:7-42
+45        <activity
+45-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:34:5-50:16
+46            android:name="com.localcinema.android.MainActivity"
+46-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:35:9-37
+47            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
+47-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:36:9-117
+48            android:exported="true"
+48-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:37:9-32
+49            android:launchMode="singleTask"
+49-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:38:9-40
+50            android:windowSoftInputMode="adjustResize" >
+50-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:39:9-51
+51            <intent-filter>
+51-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:41:7-44:23
+52                <action android:name="android.intent.action.MAIN" />
+52-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:42:9-61
+52-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:42:17-58
+53
+54                <category android:name="android.intent.category.LAUNCHER" />
+54-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:43:9-69
+54-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:43:19-66
+55            </intent-filter>
+56            <intent-filter>
+56-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:46:7-49:23
+57                <action android:name="android.intent.action.MAIN" />
+57-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:42:9-61
+57-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:42:17-58
+58
+59                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+59-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:48:9-78
+59-->D:\Coding\web film\WebXemPhim\android\app\src\main\AndroidManifest.xml:48:19-75
+60            </intent-filter>
+61        </activity>
+62    </application>
+63
+64</manifest>
