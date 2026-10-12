@@ -1,0 +1,27 @@
+/*
+ * Lớp phụ riêng cho TV LG, nạp sau tv.css. Chỉ chứa phần mà điều khiển của LG
+ * cần mà remote TV thường không có (Magic Remote, con trỏ ảo).
+ */
+
+/* Magic Remote: lúc dùng con trỏ thì viền focus của D-pad chỉ gây rối. */
+html[data-tv-pointer] [data-tv-focus] {
+  outline: none;
+}
+
+html[data-tv-pointer] .movie-card[data-tv-focus] .poster {
+  box-shadow: none;
+}
+
+/*
+ * TV LG hay bị overscan sâu hơn màn hình thường, nới lề khung ngoài thêm một chút
+ * so với giá trị tv.css đặt.
+ */
+:root {
+  --frame-gap: 30px;
+}
+
+/* Con trỏ chuột ảo của webOS: giữ mũi nhọn thay vì caret text trên poster. */
+img,
+.poster {
+  cursor: pointer;
+}
