@@ -63,7 +63,8 @@ test('danh sách: đọc paginate snake_case và chuẩn hoá thẻ phim', () =>
     items: [{
       name: 'Trường Sinh Khế (Phần 1)', slug: 'truong-sinh-khe-phan-1', original_name: 'Live Forever (Season 1)',
       thumb_url: 'https://img.nguonc.test/t.jpg', total_episodes: 20, current_episode: 'Tập 12',
-      time: '20 phút/tập', quality: 'HD', language: 'Vietsub', casts: 'Phương Dật Luân, Tạ Khả Dần', year: '2026'
+      time: '20 phút/tập', quality: 'HD', language: 'Vietsub', casts: 'Phương Dật Luân, Tạ Khả Dần', year: '2026',
+      tmdb: { id: 240411, type: 'tv', season: 1, url: null }, imdb: { id: 'tt12345678', url: null }
     }]
   }, 24);
   assert.equal(page.source, 'nguonc');
@@ -77,6 +78,21 @@ test('danh sách: đọc paginate snake_case và chuẩn hoá thẻ phim', () =>
   assert.equal(movie.status, 'ongoing');
   assert.equal(movie.duration, '20 phút/tập');
   assert.deepEqual(movie.actors, ['Phương Dật Luân', 'Tạ Khả Dần']);
+  // Tài liệu API: tmdb/imdb là MÃ phim (không phải điểm) — lấy id, không chạm rating.
+  assert.equal(movie.tmdbId, '240411');
+  assert.equal(movie.imdbId, 'tt12345678');
+  assert.equal(movie.rating, null);
+});
+
+test('type: tmdb.type thay nhóm "Định dạng" khi thẻ danh sách không có nhóm đó', () => {
+  // Thẻ danh sách thường không kèm `category`; tmdb.type là tín hiệu kế tiếp.
+  assert.equal(movieFromNguonc({ slug: 'a', name: 'A', tmdb: { type: 'tv' } }).type, 'series');
+  assert.equal(movieFromNguonc({ slug: 'b', name: 'B', tmdb: { type: 'movie' } }).type, 'single');
+  // Không có gì để đoán thì mặc định phim lẻ; tmdb/imdb vắng mặt trả null.
+  const bare = movieFromNguonc({ slug: 'c', name: 'C' });
+  assert.equal(bare.type, 'single');
+  assert.equal(bare.tmdbId, null);
+  assert.equal(bare.imdbId, null);
 });
 
 test('chi tiết: category theo nhóm thành metadata, tập chỉ có embed', () => {

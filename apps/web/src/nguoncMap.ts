@@ -106,11 +106,16 @@ const TYPE_BY_GROUP: Record<string, string> = {
   'phim bo': 'series', 'phim le': 'single', 'hoat hinh': 'hoathinh', 'tv shows': 'tvshows'
 };
 
-/** Nhóm "Định dạng" quyết định `type`; không có thì đoán theo số tập. */
+/** Nhóm "Định dạng" quyết định `type`; không có thì theo `tmdb.type`, rồi số tập. */
 function typeOf(item: any): string {
   const label = groupNames(item, 'Định dạng')[0];
   const mapped = label ? TYPE_BY_GROUP[fold(label)] : undefined;
   if (mapped) return mapped;
+  // Tài liệu API: `tmdb.type` là 'tv' hoặc 'movie'. Thẻ danh sách thường không kèm
+  // nhóm "Định dạng" nên đây là tín hiệu đáng tin trước khi đoán theo số tập.
+  const tmdbType = fold(item?.tmdb?.type);
+  if (tmdbType === 'tv') return 'series';
+  if (tmdbType === 'movie') return 'single';
   const total = num(item?.total_episodes);
   return total && total > 1 ? 'series' : 'single';
 }
@@ -145,10 +150,12 @@ export function movieFromNguonc(item: any): Movie | null {
     posterUrl: imageUrl(item?.poster_url ?? item?.poster_url_webp),
     thumbUrl: imageUrl(item?.thumb_url ?? item?.thumb_url_webp),
     trailerUrl: null,
+    // Tài liệu API ghi rõ: `tmdb`/`imdb` là **mã phim, không phải điểm đánh giá**
+    // — nên `rating` để trống, chỉ lấy `id` làm mã tra cứu (link ngoài, khớp phụ đề).
     rating: null,
     viewCount: 0,
-    tmdbId: null,
-    imdbId: null,
+    tmdbId: item?.tmdb?.id == null ? null : String(item.tmdb.id),
+    imdbId: item?.imdb?.id == null ? null : String(item.imdb.id),
     genres: groupNames(item, 'Thể loại'),
     countries: groupNames(item, 'Quốc gia'),
     actors: splitList(item?.casts),

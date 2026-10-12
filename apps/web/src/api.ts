@@ -1,9 +1,7 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { bootUrl, claimBoot } from './boot';
-import { apiUnavailable, catalogTarget } from './catalogFallback';
-import { nguoncTarget } from './nguonc';
-import { vsmovTarget } from './vsmov';
+import { catalogTarget } from './catalogFallback';
+import { resolveCatalog } from './sources';
 import type { CatalogQuery, Episode, ImportJob, Movie, MovieList, Navigation, Person, PersonList, SubtitleFile, SubtitleSearch, SyncState, TaxonomyList, UnifiedSearch } from './types';
 
 /**
@@ -66,37 +64,6 @@ function catalogUrl(kind:CatalogQuery['kind'],value?:string){
   return `/catalog/${segment}/${encodeURIComponent(value??'')}`;
 }
 
-const rawBaseQuery=fetchBaseQuery({baseUrl:apiBaseUrl});
-type QueryResult=Awaited<ReturnType<typeof rawBaseQuery>>;
-
-/**
- * Trả lời bằng request đã bắn trước từ `index.html`, nếu có một cái khớp.
- *
- * Nhờ nó mà trang chủ và trang xem không phải chờ trọn một round-trip *sau khi*
- * bundle về: câu hỏi đã đi từ lúc trình duyệt đọc HTML. `null` nghĩa là không có
- * gì dùng được — mọi nhánh lỗi đều trả `null` để đường thường chạy nguyên vẹn.
- *
- * URL do `bootUrl()` dựng, không dựng lại ở đây: nó là *một nửa* của phép so khớp
- * với chuỗi mà index.html nối bằng tay, nên phải nằm cạnh `claimBoot` để test đo
- * được cả hai nửa cùng lúc.
- */
-async function fromBoot(args:string|FetchArgs):Promise<QueryResult|null>{
-  if(typeof args!=='string'&&args.method&&args.method!=='GET')return null;
-  const reply=claimBoot(bootUrl(apiBaseUrl,args));
-  if(!reply)return null;
-  try{
-    const raw=await reply;
-    // Đúng hình dạng của fetchBaseQuery với responseHandler mặc định: mọi 2xx
-    // (kể cả 202 "đang nhập phim") vào `data`, còn lại vào `error` kèm body.
-    const data=raw.text?JSON.parse(raw.text):null;
-    return raw.ok?{data}:{error:{status:raw.status,data}};
-  }catch{
-    // Mạng chết, hoặc body không phải JSON (rewrite trả về index.html chẳng
-    // hạn): để đường thường sinh ra đúng cái lỗi mà app vẫn quen giải thích.
-    return null;
-  }
-}
-
 /**
  * Câu trả lời cho "cho tôi phim này". `movie:null` + `importing` nghĩa là API đang
  * kéo phim về ở nền và request này không chờ — đây là hình dạng làm cho việc điều
@@ -105,43 +72,53 @@ async function fromBoot(args:string|FetchArgs):Promise<QueryResult|null>{
 export interface MovieResponse{movie:Movie|null;importing?:ImportJob|null}
 
 /**
- * Nhặt lại request đã bắn trước từ `index.html` (`fromBoot`), rồi đi đường thường.
- * Nguồn phim duy nhất là VSMOV nên không còn `?source=` hay ghi nhận nguồn trả lời.
- */
-/**
- * Đọc thẳng nguồn khi **API** không trả lời — xem `catalogFallback.ts` cho lý do
- * và bảng route.
+ * Web gọi thẳng 3 nguồn phim từ trình duyệt — **không còn backend** (xem `sources.ts`).
  *
- * Đây là nhánh cứu, không phải nhánh chính: API trả lời được thì không ai gọi
- * tới đây. NguonC đứng trước vì đó là nguồn có luồng thật (embed *.streamc.xyz)
- * và cùng nguồn đó có thể loại để dựng menu; VSMOV là chặng cuối cho những gì
- * NguonC không có (quốc gia, năm, phim lạ) — chấp nhận nó chỉ còn phần chữ dùng được.
- *
- * Nguồn cũng lỗi thì trả `null` để lỗi cũ đi tiếp — người dùng nhận đúng câu
- * "không tải được dữ liệu" thay vì một lỗi khác khó hiểu hơn.
+ * Route `/catalog/*` (gồm chi tiết phim) đi qua `resolveCatalog`: thử lần lượt các
+ * nguồn, trả về đúng shape mà các endpoint bên dưới mong đợi. Những route còn lại
+ * thuộc kho/DB cũ (yêu thích, xem tiếp, người, nhập phim, phụ đề) — máy chủ không
+ * còn, nên `localAnswer` trả dữ liệu rỗng/thành công vô hại: "yêu thích" và "xem
+ * tiếp" đã có bản localStorage riêng (`libraryStore.ts`) nên trang Thư viện vẫn chạy.
  */
-async function fromSources(args:string|FetchArgs):Promise<unknown|null>{
-  const target=catalogTarget(args);
-  if(!target)return null;
-  try{
-    return await nguoncTarget(target);
-  }catch{ /* nguồn này không có thì thử chặng cuối */ }
-  try{
-    return await vsmovTarget(target);
-  }catch{
-    return null;
-  }
+function emptyList(limit = 24): MovieList {
+  return { items: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, totalItemsPerPage: limit }, source: 'none' };
 }
 
-const baseQuery:BaseQueryFn<string|FetchArgs,unknown,FetchBaseQueryError>=async(args,api,extra)=>{
-  const result=(await fromBoot(args))??(await rawBaseQuery(args,api,extra));
-  const failure='error' in result?result.error:undefined;
-  if(failure&&apiUnavailable(failure.status)){
-    const data=await fromSources(args);
-    if(data!==null)return {data};
+function localAnswer(args: string | FetchArgs): unknown {
+  const url = typeof args === 'string' ? args : args.url;
+  const path = url.split('?')[0].replace(/\/+$/, '');
+  if (path === '/search') return { query: '', movies: emptyList(), people: [] };
+  if (path === '/movies') return emptyList();
+  if (path.startsWith('/movies/')) return { movie: null };
+  if (path === '/people') return { items: [], pagination: { totalItems: 0, totalPages: 1, currentPage: 1, totalItemsPerPage: 60 } };
+  if (path.startsWith('/people/')) return { person: null, ...emptyList() };
+  if (path === '/favorites') return { items: [] };
+  if (path.startsWith('/favorites/')) return { favorite: false };
+  if (path === '/continue-watching') return { items: [] };
+  if (path === '/watch-progress') return { ok: true };
+  if (path.startsWith('/import/') && path.endsWith('/status')) return { slug: path.split('/')[2] ?? '', importing: null };
+  if (path.startsWith('/import/')) return { movie: null };
+  if (path === '/sync/status') return { status: 'idle', page: 0, totalPages: 0, processed: 0 };
+  if (path === '/sync/start') return { started: false };
+  if (path === '/health') return { ok: true, service: 'web-only', time: new Date().toISOString() };
+  if (path.startsWith('/subtitles')) return { query: '', hits: [], providers: [] };
+  if (path.startsWith('/episodes/')) return null;
+  return {};
+}
+
+/**
+ * Mọi request đi qua đây. Có `catalogTarget` thì là route danh mục/phim → hỏi nguồn;
+ * còn lại trả lời cục bộ. Không bao giờ chạm mạng tới một backend không còn tồn tại.
+ */
+const baseQuery:BaseQueryFn<string|FetchArgs,unknown,FetchBaseQueryError>=async(args)=>{
+  const target=catalogTarget(args);
+  if(target){
+    try{return {data:await resolveCatalog(target)};}
+    catch(error){return {error:{status:'CUSTOM_ERROR',error:error instanceof Error?error.message:String(error)}};}
   }
-  return result;
+  return {data:localAnswer(args)};
 };
+
 
 export const cinemaApi=createApi({
   reducerPath:'cinemaApi',

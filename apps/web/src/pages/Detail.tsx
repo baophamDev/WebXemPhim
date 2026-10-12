@@ -1,20 +1,20 @@
 import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { Heart, Play, RefreshCw, Users } from 'lucide-react';
-import { useGetFavoriteQuery, useGetMovieQuery, useImportMovieMutation, useSetFavoriteMutation } from '../api';
-import { episodesFromNguonc } from '../nguoncMap';
-import { useNguoncDetail } from '../useNguonc';
+import { Heart, Play, Users } from 'lucide-react';
+import { useGetFavoriteQuery, useSetFavoriteMutation } from '../api';
 import { preloadPlayer } from '../chunks';
 import { removeFavorite, saveFavorite, useLibrary } from '../libraryStore';
 import { previewFromState, recallMovie, rememberMovie } from '../preview';
+import { useSourceDetail } from '../useSourceDetail';
+import type { SourceId } from '../sources';
+import type { TitleHint } from '../match';
 import type { CastMember, Episode, Movie } from '../types';
-import { Breadcrumb, clean, EmptyState, ErrorState, image, ImportPanel, RailLabel, Shell, Spec, useImportProgress } from '../ui';
+import { Breadcrumb, clean, EmptyState, ErrorState, image, RailLabel, Shell, Spec } from '../ui';
 import { useHeroEntrance } from '../ui/motion';
 
 /**
- * Nút lưu phim ghi vào **cả hai** nơi: thư viện trên máy (luôn) và kho của API
- * (khi phim đã có id thật). Nhờ vậy nút vẫn dùng được khi API chết — trước đây
- * nó chỉ hiện với phim đã nhập kho, nên API chết là không lưu được gì cả.
+ * Nút lưu phim ghi vào thư viện trên máy (localStorage). Không còn backend nên phim
+ * nguồn có `id: 0` → chỉ còn nhánh local; giữ nhánh kho để nếu sau nối lại vẫn đúng.
  */
 function FavoriteButton({ movie }: { movie: Movie }) {
   const inStore = movie.id > 0;
@@ -31,15 +31,8 @@ function FavoriteButton({ movie }: { movie: Movie }) {
   </button>;
 }
 
-function ImportButton({ slug }: { slug: string }) {
-  const [run, { isLoading, isSuccess, isError }] = useImportMovieMutation();
-  return <button className="button ghost" disabled={isLoading} onClick={() => run(slug)} title="Tải lại thông tin và nguồn phát">
-    <RefreshCw className={isLoading ? 'spin' : ''} />
-    {isLoading ? 'Đang tải' : isSuccess ? 'Đã làm mới' : isError ? 'Thử lại' : 'Làm mới nguồn'}
-  </button>;
-}
-
-function EpisodeList({ movie }: { movie: Movie }) {
+/** Link tập mang theo `source` để trang Xem mở đúng nguồn đã dựng danh sách này. */
+function EpisodeList({ movie, sourceId }: { movie: Movie; sourceId: SourceId | null }) {
   const groups = useMemo(() => Object.entries((movie.episodes ?? []).reduce<Record<string, Episode[]>>((all, episode) => {
     (all[episode.serverName] ??= []).push(episode);
     return all;
@@ -51,12 +44,10 @@ function EpisodeList({ movie }: { movie: Movie }) {
     {groups.length ? groups.map(([server, episodes]) => <div className="server-group" key={server}>
       <h3>{server.trim()}</h3>
       <div className="episode-grid">
-        {/* pointerdown kéo trước chunk trang xem + hls.js: cú bấm vào một tập là
-            lúc chắc chắn nhất rằng trình phát sắp cần đến, mà nó vẫn đến trước
-            khi router đổi trang. */}
-        {episodes.map((episode) => <Link key={episode.id} to={`/watch/${movie.slug}/${episode.id}`} state={{ preview: movie }} onPointerDown={preloadPlayer}><Play />{episode.name}</Link>)}
+        {/* pointerdown kéo trước chunk trang xem + hls.js trước khi router đổi trang. */}
+        {episodes.map((episode) => <Link key={episode.id} to={`/watch/${movie.slug}/${episode.id}`} state={{ preview: movie, source: sourceId ?? undefined }} onPointerDown={preloadPlayer}><Play />{episode.name}</Link>)}
       </div>
-    </div>) : <EmptyState title="Chưa có nguồn phát" message="Bấm “Làm mới nguồn” để tải lại từ nguồn phim." />}
+    </div>) : <EmptyState title="Chưa có nguồn phát" message="Thử mở trang xem rồi đổi nguồn, hoặc chọn phim khác." />}
   </section>;
 }
 
@@ -69,13 +60,7 @@ function CastLinks({ cast, names, kind }: { cast: CastMember[]; names: string[];
   return <>{names.join(', ') || 'Đang cập nhật'}</>;
 }
 
-
-
-/**
- * Khung xương cho lúc chưa có cả bản mô tả (mở thẳng URL, hoặc F5 giữa trang).
- * Vẫn dựng đúng hình khối của trang chi tiết thay vì một vòng xoay giữa màn hình:
- * người xem thấy trang đang hình thành thì chờ được, thấy vòng xoay thì tưởng treo.
- */
+/** Khung xương cho lúc chưa có cả bản mô tả (mở thẳng URL, hoặc F5 giữa trang). */
 function DetailSkeleton() {
   return <section className="detail-hero skeleton" aria-hidden="true">
     <div className="hero-veil" />
@@ -90,72 +75,38 @@ function DetailSkeleton() {
   </section>;
 }
 
+/**
+ * Chi tiết phim lấy thẳng từ nguồn (không còn backend). `useSourceDetail('auto')`
+ * tự chọn nguồn phát được; danh sách tập và nút "Xem ngay" mang theo nguồn đó để
+ * trang Xem mở đúng nguồn (và còn đổi nguồn bằng tay ở đó).
+ */
 export default function Detail() {
   const { slug = '' } = useParams();
   const location = useLocation();
-  const pathname = location.pathname;
-  const result = useGetMovieQuery(slug);
-  const fetched = result.data?.movie ?? null;
-  /**
-   * Bản trong kho vẫn có thể là bản cũ: VSMOV trả `link_m3u8` rỗng và embed
-   * `s2.streamvsmov.com` đã 522 + chặn iframe, nên phim nhập từ trước bấm vào là
-   * màn hình đen. Chừng nào còn bản như vậy thì hỏi thẳng NguonC lấy tập thật —
-   * server cũng đang nhập lại ở nền, nhưng người xem không phải chờ nó.
-   */
-  const stale = Boolean(fetched && fetched.provider === 'vsmov' && !fetched.episodes?.some((episode) => episode.m3u8Url));
-  /**
-   * API trả 202 (`movie: null` kèm `importing`) khi phim chưa có trong kho.
-   * Job nhập ở nền chạy song song; trình duyệt tự kéo detail từ NguonC để có đủ
-   * phim + tập xem ngay. Bản kéo thẳng đó chỉ gửi về kho khi phim **chưa** có bản
-   * nào — phim đã có thì để job của API lo, tránh hai bên tranh nhau ghi.
-   */
-  const active = Boolean(result.data && !fetched);
-  const progress = useImportProgress(slug, active);
-  /** Kho chưa có tập nào (hoặc chỉ có player giả của VSMOV) thì mới cần tập trực tiếp. */
-  const needsDirect = !fetched || stale || !(fetched.episodes?.length);
-  const direct = useNguoncDetail(slug, needsDirect, !fetched);
-  /**
-   * Bản mô tả của thẻ phim vừa bấm — có poster, tên, năm, điểm. Đủ để vẽ nửa trên
-   * của trang ngay khi điều hướng, trong lúc API còn đang kéo danh sách tập về.
-   */
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
-  const directEpisodes = direct.data ? episodesFromNguonc(direct.data.episodes) : null;
-  /**
-   * Tập trong kho thắng tập trực tiếp khi chúng phát được: chúng có `id` thật,
-   * nhờ đó tiến trình gắn đúng tập và "Xem tiếp" hoạt động. Tập của NguonC (id
-   * âm) chỉ thay vào khi kho chưa có gì phát được.
-   */
-  const preferDirect = Boolean(directEpisodes?.length) && (!fetched || stale || !(fetched.episodes?.length));
-  const movie: Movie | null =
-    (fetched && preferDirect ? { ...fetched, episodes: directEpisodes! } : fetched)
-    ?? (direct.data ? ({ ...direct.data.movie, episodes: directEpisodes ?? [] } as Movie) : null)
-    ?? preview;
-  const failed = result.isError || Boolean(progress.failure);
-  /** Chỉ kho mới có id thật: lưu phim và làm mới nguồn đều cần id đó. */
-  const inStore = Boolean(fetched && fetched.id > 0);
-  // Hook entrance phải đứng trước mọi `return` có điều kiện (luật hooks):
-  // đổi slug thì diễn lại từ đầu, còn skeleton/error thì ref không gắn vào đâu.
+  const hint = useMemo<TitleHint>(() => ({
+    name: preview?.name ?? '', originName: preview?.originName ?? null, year: preview?.year ?? null, slug
+  }), [preview?.name, preview?.originName, preview?.year, slug]);
+  const detail = useSourceDetail(slug, hint, 'auto');
+  const movie: Movie | null = detail.data?.movie ?? preview ?? null;
+  // Hook entrance phải đứng trước mọi `return` có điều kiện (luật hooks).
   const scope = useHeroEntrance<HTMLElement>([slug]);
   // Nhớ bản đầy đủ: quay lại trang này (back/forward) là có ngay, không chờ mạng.
-  useEffect(() => { rememberMovie(fetched); }, [fetched]);
+  useEffect(() => { if (detail.data?.movie) rememberMovie(detail.data.movie); }, [detail.data]);
 
   if (!movie) {
-    if (failed) {
+    if (detail.error) {
       return <Shell><div className="page-container page-top">
-        <ErrorState onRetry={() => { progress.retry(); result.refetch(); }} message={progress.failure || 'Không mở được phim này.'} />
+        <ErrorState message={detail.error} />
       </div></Shell>;
     }
-    return <Shell flush>
-      <DetailSkeleton />
-      {active ? <div className="page-container detail-content"><ImportPanel progress={progress} onRetry={() => { progress.retry(); result.refetch(); }} /></div> : null}
-    </Shell>;
+    return <Shell flush><DetailSkeleton /></Shell>;
   }
 
   const cast = movie.cast ?? [];
   const actors = cast.filter((member) => member.kind === 'actor');
   const first = movie.episodes?.[0];
-  /** Chưa có bản trong kho: nguồn phát đến từ NguonC trực tiếp hoặc đang tải. */
-  const loading = !fetched && !direct.data;
+  const loading = detail.isFetching && !movie.episodes?.length;
 
   return <Shell flush>
     <section className="detail-hero" ref={scope}>
@@ -171,19 +122,17 @@ export default function Detail() {
           <p className="description">{clean(movie.description) || 'Chưa có mô tả.'}</p>
           <div className="actions">
             {first
-              ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`} state={{ preview: movie }} onPointerDown={preloadPlayer}><Play fill="currentColor" />Xem ngay</Link>
+              ? <Link className="button primary" to={`/watch/${movie.slug}/${first.id}`} state={{ preview: movie, source: detail.sourceId ?? undefined }} onPointerDown={preloadPlayer}><Play fill="currentColor" />Xem ngay</Link>
               : <button className="button primary" disabled><Play />{loading ? 'Đang tải nguồn phát' : 'Chưa có tập'}</button>}
-            {/* Lưu phim được cả khi kho chưa có bản ghi: bản trên máy là chỗ lưu chính. */}
             <FavoriteButton movie={movie} />
-            {pathname.startsWith('/movie/') && !loading && inStore ? <ImportButton slug={slug} /> : null}
           </div>
         </div>
       </div>
     </section>
     <div className="page-container detail-content">
       {loading
-        ? <ImportPanel progress={progress} onRetry={() => { progress.retry(); result.refetch(); }} />
-        : <EpisodeList movie={movie} />}
+        ? <section className="episodes"><EmptyState title="Đang tải nguồn phát" message="Đang hỏi các nguồn phim…" /></section>
+        : <EpisodeList movie={movie} sourceId={detail.sourceId} />}
       <section className="detail-info">
         <div>
           <RailLabel prefix="THÔNG TIN">Chi tiết</RailLabel>
@@ -204,3 +153,4 @@ export default function Detail() {
     </div>
   </Shell>;
 }
+

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react';
-import { useGetEpisodeQuery, useGetMovieQuery, useSaveProgressMutation } from '../api';
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, LoaderCircle } from 'lucide-react';
+import { useSaveProgressMutation } from '../api';
 import { loadPlayerEngine } from '../chunks';
 import { recordProgress } from '../libraryStore';
-import { episodesFromNguonc } from '../nguoncMap';
 import { previewFromState, recallMovie, type MoviePreview } from '../preview';
-import { useNguoncDetail } from '../useNguonc';
+import { useSourceDetail, type SourceDetailState, type SourcePref } from '../useSourceDetail';
+import type { TitleHint } from '../match';
 import { SubtitlePicker } from '../subs/Panel';
 import type { CueSize } from '../subs/store';
 import { useSubtitles, type ActiveCue } from '../subs/useSubtitles';
@@ -15,6 +15,15 @@ import { ErrorState } from '../ui';
 
 /** HLS trực tiếp là đường chính; trang nhúng là đường lùi khi HLS không phát được. */
 type Stage = 'direct' | 'embed';
+
+/**
+ * Host nhúng đã biết là **chặn iframe** (Cloudflare + X-Frame-Options), vd
+ * `*.streamc.xyz` của NguonC. Dựng khung cho nó chỉ ra màn "refused to connect"
+ * đen sì, nên thay bằng tấm mời mở ở tab mới — nơi trình duyệt vượt được Cloudflare.
+ */
+function embedBlocksFrame(url: string): boolean {
+  try { return /(^|\.)streamc\.xyz$/i.test(new URL(url).hostname); } catch { return false; }
+}
 
 function VideoPlayer({ episode, title, subtitle, cueSize, onProgress }: {
   episode: Episode; title: string; subtitle: ActiveCue | null; cueSize: CueSize;
@@ -118,6 +127,14 @@ function VideoPlayer({ episode, title, subtitle, cueSize, onProgress }: {
   }, [subtitle?.url, source]);
 
   if (!source) {
+    // Host chặn iframe (streamc của NguonC): khỏi dựng khung chết, mời mở tab mới.
+    if (embedBlocksFrame(episode.embedUrl)) {
+      return <div className="embed-blocked">
+        <ExternalLink />
+        <p>Nguồn NguonC (streamc.xyz) chặn phát trong khung. Mở ở tab mới để xem, hoặc đổi sang KKPhim ở trên.</p>
+        <a className="button primary" href={episode.embedUrl} target="_blank" rel="noreferrer"><ExternalLink />Mở trình phát ở tab mới</a>
+      </div>;
+    }
     return <iframe
       src={episode.embedUrl}
       title={title}
@@ -155,8 +172,27 @@ function snapshotOf(slug: string, name: string): MoviePreview {
   };
 }
 
-function Screen({ slug, title, movie, episode, episodes }: {
-  slug: string; title: string; movie: Movie | null; episode: Episode; episodes: Episode[];
+/**
+ * Thanh đổi nguồn phát. Tách riêng để dùng được cả khi đang xem (trong `Screen`)
+ * lẫn khi một nguồn ép tay vừa thất bại (màn lỗi vẫn phải cho đổi sang nguồn khác,
+ * không được để người xem kẹt).
+ */
+function SourceSwitch({ detail }: { detail: SourceDetailState }) {
+  return <div className="source-switch" role="group" aria-label="Nguồn phát">
+    <span className="source-switch-label">Nguồn</span>
+    {detail.sources.map((item) => <button
+      key={item.id} type="button"
+      className={detail.sourceId === item.id ? 'chip active' : 'chip'}
+      aria-pressed={detail.sourceId === item.id}
+      disabled={detail.isFetching}
+      onClick={() => detail.setSource(item.id)}
+      title={`Phát bằng ${item.label}`}
+    >{detail.isFetching && detail.pref === item.id ? <LoaderCircle className="spin" /> : null}{item.label}</button>)}
+  </div>;
+}
+
+function Screen({ slug, title, movie, episode, episodes, detail }: {
+  slug: string; title: string; movie: Movie | null; episode: Episode; episodes: Episode[]; detail: SourceDetailState;
 }) {
   const navigate = useNavigate();
   const [save] = useSaveProgressMutation();
@@ -205,11 +241,15 @@ function Screen({ slug, title, movie, episode, episodes }: {
   }, [episode.id, trackable, save]);
 
   const index = episodes.findIndex((item) => item.id === episode.id);
+  const activeLabel = detail.sources.find((item) => item.id === detail.sourceId)?.label ?? '';
   return <div className="watch-page">
     <div className="watch-header">
       <Link to={`/movie/${slug}`}><ArrowLeft /><span>Quay lại</span></Link>
       <div><b>{title}</b><small>{episode.serverName.trim()} · {episode.name}</small></div>
       <div className="watch-tools">
+        {/* Đổi nguồn phát bằng tay: một nguồn sập (vd NguonC bị Cloudflare chặn) thì
+            bấm nguồn khác, trang tự tìm lại đúng phim ở nguồn đó theo tên. */}
+        <SourceSwitch detail={detail} />
         <SubtitlePicker subs={subs} episodeId={episode.id} />
         {/* Danh sách tập đến cùng request phim; chưa có thì ẩn ô chọn chứ không hiện ô rỗng. */}
         {episodes.length > 1 ? <label>
@@ -221,6 +261,9 @@ function Screen({ slug, title, movie, episode, episodes }: {
         </label> : null}
       </div>
     </div>
+    {!episode.m3u8Url ? <div className="watch-note">
+      <span>Nguồn “{activeLabel}” nhúng từ trang ngoài. Xem mượt nhất là đổi sang <b>KKPhim</b> ở trên (phát thẳng trong khung); NguonC thì mở ở tab mới.</span>
+    </div> : null}
     <div className="player-frame">
       <VideoPlayer
         episode={episode} title={`${title} — ${episode.name}`} subtitle={subs.cue} cueSize={subs.size}
@@ -239,48 +282,58 @@ function Screen({ slug, title, movie, episode, episodes }: {
 }
 
 /**
- * Hai request song song, và **cái nhẹ hơn quyết định lúc bắt đầu phát**.
+ * Lấy chi tiết phim thẳng từ nguồn (không còn backend) và cho đổi nguồn bằng tay.
  *
- * `/episodes/:id` đọc một dòng: có link phát là bấm play được. `/movies/:slug` phải
- * join phim + tập + người để dựng tiêu đề, danh sách tập và nút tập trước/tập sau —
- * những thứ đó đến sau vài trăm ms cũng không ai để ý, nhưng bắt người xem chờ nó
- * mới được phát thì có.
- *
- * Phim chưa có trong kho: `fetchedMovie` null, nhưng detail từ vsmov (id âm) vẫn
- * cho phát ngay — trình duyệt tự kéo về ở trang chi tiết trước khi bấm xem, và
- * ingest đang ghi vào kho ở nền cho lần sau.
+ * `useSourceDetail` tự chọn nguồn phát được (ưu tiên m3u8 của KKPhim), hoặc theo
+ * nguồn người xem đã ghim. Tập trên URL mang id âm của **một** nguồn; đổi nguồn thì
+ * id đó không còn trong danh sách mới, nên hiệu ứng dưới nhảy tới tập **cùng số** ở
+ * nguồn mới rồi thay URL — nhờ vậy nút tập trước/sau và ô chọn vẫn khớp.
  */
 export default function Watch() {
   const { slug = '', episodeId = '' } = useParams();
   const id = Number(episodeId);
   const location = useLocation();
-  const episodeQuery = useGetEpisodeQuery(id, { skip: !Number.isInteger(id) || id <= 0 });
-  const movieQuery = useGetMovieQuery(slug);
-  const fetchedMovie = movieQuery.data?.movie ?? null;
-  // Tên phim cho thanh trên: bản mô tả từ thẻ phim đã đủ, không cần chờ join.
+  const navigate = useNavigate();
   const preview = useMemo(() => previewFromState(location.state) ?? recallMovie(slug), [location.state, slug]);
-  const stored = fetchedMovie ?? preview;
-  /**
-   * Tập id âm đến thẳng từ nguồn nên chỉ sống trong tab đang mở: mở thẳng link
-   * hoặc F5 là kho tạm trống. Thư viện lại trỏ tới đúng những tập đó, nên khi
-   * chưa có tập nào trong tay thì hỏi lại nguồn — cùng thứ tự tập, cùng id âm.
-   */
-  const needsDirect = !stored?.episodes?.length;
-  const directDetail = useNguoncDetail(slug, needsDirect, false);
-  const directEpisodes = directDetail.data ? episodesFromNguonc(directDetail.data.episodes) : null;
-  const episodes = stored?.episodes?.length ? stored.episodes : (directEpisodes ?? []);
-  const movie: Movie | null = stored ?? (directDetail.data ? ({ ...directDetail.data.movie, episodes: directEpisodes ?? [] } as Movie) : null);
-  const episode = episodes.find((item) => item.id === id)
-    ?? (Number.isInteger(id) && id > 0 ? episodeQuery.data ?? null : null);
+  const initialPref = (location.state as { source?: SourcePref } | null)?.source ?? 'auto';
+  const hint = useMemo<TitleHint>(() => ({
+    name: preview?.name ?? '', originName: preview?.originName ?? null, year: preview?.year ?? null, slug
+  }), [preview?.name, preview?.originName, preview?.year, slug]);
+  const detail = useSourceDetail(slug, hint, initialPref);
+  const episodes = detail.data?.episodes ?? [];
+  const movie: Movie | null = detail.data?.movie ?? preview ?? null;
+  const episode = episodes.find((item) => item.id === id) ?? null;
+
+  // Nhớ số tập đang xem để khi đổi nguồn (id khác hệ) còn nhảy đúng tập.
+  const lastNumber = useRef<number | null>(null);
+  useEffect(() => { if (episode?.episodeNumber != null) lastNumber.current = episode.episodeNumber; }, [episode?.id, episode?.episodeNumber]);
+
+  // Đổi nguồn/F5: id trên URL không thuộc danh sách nguồn hiện tại → nhảy tới tập
+  // cùng số (hoặc tập đầu) và thay URL, không thêm một mục history mới.
+  useEffect(() => {
+    if (!episodes.length || episodes.some((item) => item.id === id)) return;
+    const want = lastNumber.current;
+    const next = (want != null && episodes.find((item) => item.episodeNumber === want)) || episodes[0];
+    navigate(`/watch/${slug}/${next.id}`, { replace: true, state: location.state });
+  }, [episodes, id, slug, navigate, location.state]);
 
   if (!episode) {
-    // Chỉ kết luận "không có tập này" khi mọi request đã yên: một cái lỗi mà cái
-    // kia còn đang chạy thì vẫn còn cơ hội có dữ liệu.
-    if (episodeQuery.isFetching || movieQuery.isFetching || directDetail.isFetching) return <div className="watch-loading"><LoaderCircle className="spin" /></div>;
-    return <div className="watch-loading"><ErrorState message="Tập phim không còn tồn tại." /></div>;
+    // Nguồn ép tay thất bại (hoặc không nguồn nào có): vẫn phải cho đổi nguồn khác,
+    // không để người xem kẹt ở màn lỗi. Còn đang tải/chờ nhảy tập thì hiện vòng xoay.
+    if (detail.error && !episodes.length) {
+      return <div className="watch-page">
+        <div className="watch-header">
+          <Link to={`/movie/${slug}`}><ArrowLeft /><span>Quay lại</span></Link>
+          <div><b>{movie?.name || 'Phim'}</b><small>Nguồn này không phát được</small></div>
+          <div className="watch-tools"><SourceSwitch detail={detail} /></div>
+        </div>
+        <div className="watch-loading"><ErrorState message={detail.error} onRetry={() => detail.setSource('auto')} /></div>
+      </div>;
+    }
+    return <div className="watch-loading"><LoaderCircle className="spin" /></div>;
   }
   return <Screen
     slug={slug} title={movie?.name || 'Đang tải tên phim'} movie={movie}
-    episode={episode} episodes={episodes}
+    episode={episode} episodes={episodes} detail={detail}
   />;
 }

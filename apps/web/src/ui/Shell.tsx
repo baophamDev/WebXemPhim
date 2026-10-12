@@ -4,7 +4,7 @@
  */
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
-import { Clapperboard, Film, Library, Menu, Search, Server, Users, X } from 'lucide-react';
+import { Clapperboard, Film, Library, Menu, Search, Server, X } from 'lucide-react';
 // Import thẳng từ './pickers', không qua barrel './index': Shell nằm trong barrel đó
 // nên đi đường vòng là tạo phụ thuộc quay đầu giữa hai module.
 import { DiscoverMenu } from './DiscoverMenu';
@@ -61,7 +61,6 @@ export function Header() {
       <NavLink to="/browse/list/phim-le"><Film />Phim lẻ</NavLink>
       <NavLink to="/browse/list/phim-bo"><Clapperboard />Phim bộ</NavLink>
       <DiscoverMenu />
-      <NavLink to="/people"><Users />Diễn viên</NavLink>
       <NavLink to="/library"><Library />Thư viện</NavLink>
       <button className="nav-close icon-button" onClick={() => setMenuOpen(false)} aria-label="Đóng menu"><X /></button>
     </nav>
@@ -97,7 +96,7 @@ export function SiteFooter() {
   return <footer>
     <Logo />
     <p>© {new Date().getFullYear()} BảoNhànCinema · Rạp phim riêng của gia đình</p>
-    <div><Link to="/local">Kho đã lưu</Link><Link to="/people">Diễn viên</Link></div>
+    <div><Link to="/library">Thư viện</Link><Link to="/browse/list/phim-moi-cap-nhat">Khám phá</Link></div>
   </footer>;
 }
 
